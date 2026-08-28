@@ -333,6 +333,20 @@ Useful language names: `sql`, `python`, `dax`, `powerquery`, `excel`, `bash`,
 `json`, `yaml`, `text`. Use `text` for anything with no highlighting, like
 console output.
 
+Two things happen automatically, so you never have to trim a snippet to make it
+fit:
+
+- **Long lines wrap.** A code block never scrolls sideways, on any screen, so
+  nothing is hidden off the right edge. Wrapped continuations are indented a
+  couple of characters so they still read as part of the line above.
+- **Long blocks are folded.** Anything taller than about 30 rows is cut off
+  there with a *Show all N lines* button underneath. On a phone the same 30 rows
+  hold fewer lines of code, because more of them have wrapped — the cap is on
+  how much of the page the block eats, not on the source.
+
+So paste the whole script when the whole script is the point. The copy button
+always copies all of it, folded or not.
+
 ---
 
 ## MDX gotchas

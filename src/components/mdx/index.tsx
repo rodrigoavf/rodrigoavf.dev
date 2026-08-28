@@ -1,9 +1,9 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CopyButton } from "@/components/copy-button";
 import { getImageSize } from "@/lib/image-size";
 import { Callout } from "./callout";
+import { CodeBlock } from "./code-block";
 import { Embed, PowerBIEmbed, YouTube } from "./embed";
 import { Figure } from "./figure";
 
@@ -69,16 +69,6 @@ function MdxLink({ href, children, ...props }: ComponentPropsWithoutRef<"a">) {
   );
 }
 
-/** Code blocks, wrapped so a copy button can sit in the corner. */
-function Pre({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
-  return (
-    <div className="group relative my-6">
-      <pre {...props}>{children}</pre>
-      <CopyButton />
-    </div>
-  );
-}
-
 /** Tables scroll sideways on narrow screens rather than breaking the layout. */
 function Table({ children }: { children?: ReactNode }) {
   return (
@@ -91,7 +81,7 @@ function Table({ children }: { children?: ReactNode }) {
 export const mdxComponents = {
   img: MdxImage,
   a: MdxLink,
-  pre: Pre,
+  pre: CodeBlock,
   table: Table,
   // Available to author with, without importing anything:
   Figure,

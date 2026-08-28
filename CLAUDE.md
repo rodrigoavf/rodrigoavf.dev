@@ -235,6 +235,16 @@ placeholder:
   the same box, so nothing is inset relative to anything else. Use the
   `<Container>` component rather than setting a max width per page, and do not
   reintroduce a narrower column for prose.
+- **Code blocks wrap; they never scroll sideways.** `.prose pre` is
+  `white-space: pre-wrap`, and `.prose pre code` pins its single grid column to
+  `minmax(0, 1fr)` — without that the implicit column sizes to its widest line
+  and the wrapping silently stops working. Blocks fold to 30 rows: the cap lives
+  in `--code-collapsed-height` and is applied by CSS from the first paint, so a
+  long block never renders full height and then snaps shut on hydration.
+  `<CodeBlock>` re-derives the same figure from the computed line height to
+  decide whether to offer the expander, so the two must agree. The cap is on
+  *rendered rows*, not source lines — a wrapped line costs more than one row,
+  which is the point on a phone.
 - `html` sets `scrollbar-gutter: stable`. **Do not remove it.** Without it, pages
   long enough to scroll (Home, Writing) lose scrollbar width from the viewport
   while short ones (Projects, About) do not, so the centred layout — header
@@ -271,6 +281,8 @@ Working:
   from the file at build time.
 - Syntax highlighting via Shiki, emitting both themes as CSS variables so a theme
   switch needs no re-highlight.
+- Code blocks wrap instead of scrolling sideways, and fold to 30 rows with a
+  *Show all N lines* control (`src/components/mdx/code-block.tsx`).
 - Light/dark themes with a toggle, an OS-preference default, and no flash on load.
 - Client-side search over every collection (see below).
 - `sitemap.xml`, `robots.txt`, RSS at `/feed.xml`, per-page OpenGraph metadata.

@@ -308,7 +308,13 @@ body {
 --------------------------------------------------------------------------- */
 
 .prose pre {
-  overflow-x: auto;
+  /* Code wraps instead of scrolling sideways. A horizontal scrollbar inside an
+     article is easy to miss on a desktop and awkward on a phone, and it hides
+     the end of exactly the lines worth reading. `anywhere` is the fallback for
+     things with no break opportunity at all, like a long URL or a hash. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--surface);
@@ -316,11 +322,43 @@ body {
   font-size: 0.875rem;
   line-height: 1.7;
   tab-size: 2;
+
+  /* The height a long block is cut down to: 30 rows plus the block's own
+     padding. `em` here is the block's 0.875rem, so this tracks the font size.
+     <CodeBlock> measures the same figure to decide whether to offer the
+     expander — change one and change the other. */
+  --code-collapsed-height: calc(30 * 1.7em + 2rem);
 }
 
 .prose pre code {
+  /* One column, explicitly minmax(0, 1fr): an implicit grid column sizes to
+     its widest content, which would let a long line push past the container
+     and undo the wrapping above. */
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Long blocks are clipped from the first paint, so nothing jumps on hydration.
+   <CodeBlock> lifts this once it has measured a block that fits. */
+[data-code-collapsed] pre {
+  max-height: var(--code-collapsed-height);
+}
+
+/* Softens the cut so it reads as "there is more" rather than as the end. */
+.code-fade {
+  position: absolute;
+  inset-inline: 1px;
+  bottom: 1px;
+  height: 4.5rem;
+  border-radius: 0 0 0.75rem 0.75rem;
+  background: linear-gradient(
+    to top,
+    var(--surface),
+    color-mix(in oklab, var(--surface) 60%, transparent) 55%,
+    transparent
+  );
+  pointer-events: none;
 }
 
 [data-rehype-pretty-code-figure] pre code span {
@@ -338,15 +376,19 @@ body {
 }
 
 /* Line numbers / highlighted lines, if ever enabled per-block. */
+/* Wrapped rows are indented past the start of their line, so a continuation
+   never reads as a new statement. */
 .prose pre code [data-line] {
   padding-inline: 0.1rem;
+  padding-left: calc(0.1rem + 2ch);
+  text-indent: -2ch;
 }
 
 .prose pre code [data-highlighted-line] {
   background: color-mix(in oklab, var(--accent) 12%, transparent);
   border-left: 2px solid var(--accent);
   margin-left: -1.1rem;
-  padding-left: calc(1.1rem - 2px);
+  padding-left: calc(1.1rem - 2px + 2ch);
   margin-right: -1.1rem;
 }
 
