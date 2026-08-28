@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Container } from "@/components/container";
 import { EntryCards, EntryList } from "@/components/entry-list";
 import { EmptyState } from "@/components/page-shell";
+import { Portrait } from "@/components/portrait";
 import { getEntries } from "@/lib/content";
 import { site } from "@/lib/site";
 
@@ -17,30 +18,40 @@ export default function Home() {
           overflow, and a negative z-index hid it behind the body background. */}
       <div className="hero-glow border-b border-border">
         <Container>
-          <section className="py-20 sm:py-28">
-            <p className="font-mono text-sm text-accent">
-              Hi, I&apos;m {site.name}
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              {site.tagline}
-            </h1>
-            <p className="mt-6 text-lg leading-relaxed text-muted text-pretty">
-              {site.intro}
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/writing"
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
-              >
-                Read the writing
-              </Link>
-              <Link
-                href="/about"
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
-              >
-                About me
-              </Link>
+          {/* The portrait is bottom-aligned so its crop line lands on the
+              section's bottom border rather than floating mid-air. */}
+          <section className="flex flex-col gap-10 pt-20 sm:pt-28 lg:flex-row lg:items-end lg:gap-12">
+            <div className="pb-20 sm:pb-28 lg:flex-1">
+              <p className="font-mono text-sm text-accent">
+                Hi, I&apos;m {site.name}
+              </p>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                {site.tagline}
+              </h1>
+              <p className="mt-6 text-lg leading-relaxed text-muted text-pretty">
+                {site.intro}
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/writing"
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+                >
+                  Read the writing
+                </Link>
+                <Link
+                  href="/about"
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                >
+                  About me
+                </Link>
+              </div>
             </div>
+
+            <Portrait
+              priority
+              className="w-48 self-center sm:w-56 lg:w-72 lg:self-end"
+              sizes="(min-width: 1024px) 288px, 224px"
+            />
           </section>
         </Container>
       </div>

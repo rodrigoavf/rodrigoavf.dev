@@ -464,3 +464,26 @@ body {
       transparent 72%
     );
 }
+
+/* ---------------------------------------------------------------------------
+   Portrait.
+
+   The source PNG is a cut-out cropped mid-shoulder. The glow grounds it so it
+   does not float, and the fade softens the crop line at the bottom.
+--------------------------------------------------------------------------- */
+
+.portrait-glow {
+  border-radius: 9999px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--tone-cheatsheets) 22%, transparent),
+    color-mix(in oklab, var(--tone-posts) 10%, transparent) 65%,
+    transparent 100%
+  );
+  filter: blur(6px);
+}
+
+.portrait-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+}

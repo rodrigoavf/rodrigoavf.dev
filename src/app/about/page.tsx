@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { EmailLink } from "@/components/email-link";
 import { PageShell } from "@/components/page-shell";
+import { Portrait } from "@/components/portrait";
 import { site } from "@/lib/site";
 
 export const metadata = {
@@ -137,6 +138,13 @@ export default function AboutPage() {
     <PageShell
       title="About"
       intro={`${site.role} — ${site.location}.`}
+      aside={
+        <Portrait
+          priority
+          className="w-40 shrink-0 sm:w-52"
+          sizes="(min-width: 640px) 208px, 160px"
+        />
+      }
     >
       <div className="prose">
         <p>

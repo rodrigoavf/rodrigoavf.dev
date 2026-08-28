@@ -82,6 +82,12 @@ colours, since it never sits on a light background) and Next generates the
 that same SVG. `public/logo-mark.svg` is the standalone mark for anywhere
 outside the app.
 
+`public/Rodrigo_Portrait.png` is a cut-out with a real alpha channel, rendered by
+`<Portrait>`. It carries a soft brand-coloured glow (so the figure is grounded
+rather than floating) and a short bottom fade (the source is cropped
+mid-shoulder, and the hard edge would otherwise read as a mistake). It is
+519x480, so do not render it much wider than ~300px.
+
 `HowToEdit.mdx` at the repo root is the owner's own reference for writing posts
 — frontmatter fields, image paths, embed syntax, MDX pitfalls. It is deliberately
 outside `content/`, so it is never rendered or published. Keep it in sync when
@@ -253,6 +259,9 @@ placeholder:
   genuinely requires it.
 - Site name, role, location, nav, and social links live in `src/lib/site.ts` —
   edit them there, not inline in components.
+- `<PageShell>` takes an optional `aside`, which puts an element beside the page
+  title. Only that header row splits into two columns — everything below stays
+  the full page width, so the single-width rule still holds for content.
 - The About page (`src/app/about/page.tsx`) is plain JSX, not MDX: its content is
   structured data (roles, skills, certifications) rather than prose, and there is
   only ever one of it. Update the arrays at the top of the file.
