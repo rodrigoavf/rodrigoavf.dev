@@ -127,6 +127,13 @@ workflow — Vercel rebuilds on push.
   genuinely requires it.
 - Site name, nav, and social links live in `src/lib/site.ts` — edit them there,
   not inline in components.
+- **The contact address is stored ROT13-encoded** (`site.emailRot13`) and decoded
+  only inside `<EmailLink>`'s click handler, so it is in neither the prerendered
+  HTML nor the live DOM. That component is a `<button>`, not an `<a>`, precisely
+  because an anchor would have to expose the decoded `mailto:` in an attribute.
+  Never turn it back into a plain `mailto:` link, never paste the plain address
+  into the source, and never put it in metadata, JSON-LD or an `aria-label` —
+  those all ship in the HTML.
 
 ## Current state
 
