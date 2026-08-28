@@ -102,6 +102,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  /* Reserve room for the scrollbar on every page.
+
+     Without this, a page tall enough to scroll (Home, Writing) loses ~15px of
+     viewport to the scrollbar while a short one (Projects, About) does not, so
+     the centred container — header included — sits a few pixels further left on
+     the long pages. Navigating between them visibly nudges the whole layout
+     sideways. */
+  scrollbar-gutter: stable;
+}
+
+/* Safari before 18.2 has no scrollbar-gutter; a permanently visible scrollbar
+   track achieves the same stability there. */
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

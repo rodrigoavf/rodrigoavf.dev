@@ -172,6 +172,10 @@ workflow — Vercel rebuilds on push.
 - Width comes from two CSS variables in `globals.css`: `--container` (the page,
   64rem) and `--measure` (the readable text column, 42rem). Use the `<Container>`
   component rather than setting a max width per page.
+- `html` sets `scrollbar-gutter: stable`. **Do not remove it.** Without it, pages
+  long enough to scroll (Home, Writing) lose scrollbar width from the viewport
+  while short ones (Projects, About) do not, so the centred layout — header
+  included — jumps sideways a few pixels as you navigate between them.
 - Inside an article, `.prose` is a grid: text sits in the `--measure` column, and
   any direct child with the `wide` class (figures, embeds, code blocks, tables)
   spans the full container. Add `wide` to new block-level MDX components.
