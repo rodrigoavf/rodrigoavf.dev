@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Container } from "@/components/container";
+import { Logo } from "@/components/logo";
 import { SearchDialog } from "@/components/search-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { site } from "@/lib/site";
@@ -13,9 +14,13 @@ export function SiteHeader() {
         <div className="flex h-16 items-center justify-between gap-4">
           <Link
             href="/"
-            className="font-mono text-sm font-medium tracking-tight transition-opacity hover:opacity-70"
+            aria-label={`${site.domain} — home`}
+            className="flex items-center gap-2.5 transition-opacity hover:opacity-70"
           >
-            {site.domain}
+            <Logo className="h-6 w-auto" />
+            <span className="font-mono text-sm font-medium tracking-tight">
+              {site.domain}
+            </span>
           </Link>
 
           {/* Inline from sm up; below that the links move to their own row so

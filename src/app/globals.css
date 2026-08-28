@@ -9,27 +9,35 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  /* Neutrals carry a slight warmth so the page reads as paper rather than
-     switched-off grey. */
-  --background: #faf9f7;
+  /* Light theme: the logo's palette read onto paper. The navy becomes the text
+     colour, and the turquoise and cyan are darkened until they carry AA on a
+     white background — the logo's own values are far too light for that. */
+  --background: #f6f8fb;
   --surface: #ffffff;
-  --foreground: #16181d;
-  --muted: #575f70;
-  --border: #e6e3dd;
+  --foreground: #0a1020;
+  --muted: #545f78;
+  --border: #e0e6ef;
 
-  --accent: #3a52b8;
+  --accent: #067a68;
   /* Readable text on an --accent fill. Flips with the theme, because the
      accent is dark on light and light on dark. */
   --on-accent: #ffffff;
-  --warning: #a1500a;
+  --warning: #9c530b;
 
-  /* One hue per collection. Used for tags, card hovers and the labels in
-     search results, so colour signals *what kind of thing* something is
-     rather than just decorating. Every value is AA on both background and
-     surface — check before changing one. */
-  --tone-posts: #3a52b8;
-  --tone-projects: #a2560c;
-  --tone-cheatsheets: #0d7268;
+  /* One hue per collection. Two come straight from the logo — cyan for
+     Writing, turquoise for Cheat Sheets — with amber for Projects, which the
+     logo does not have but the palette needs: three cool hues would be hard to
+     tell apart. Every value is AA on both background and surface. */
+  --tone-posts: #0a6f9e;
+  --tone-projects: #9c530b;
+  --tone-cheatsheets: #067a68;
+
+  /* Logo gradient. Darkened here: the logo's own cyan and turquoise sit at
+     2.0:1 and 1.4:1 on white, well under the 3:1 a graphic needs to be made
+     out. The dark theme below uses the real values. */
+  --logo-from: #0087c7;
+  --logo-mid: #0b93ac;
+  --logo-to: #0f9e88;
 
   /* The active tone, overridden per element by [data-tone]. */
   --tone: var(--accent);
@@ -41,36 +49,45 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #0d1017;
-    --surface: #141824;
-    --foreground: #e9ecf2;
-    --muted: #98a1b3;
-    --border: #262b38;
+    /* Dark theme: the logo's own colours, near enough unchanged. */
+    --background: #050a16;
+    --surface: #0d1626;
+    --foreground: #e9eef7;
+    --muted: #8d9bb5;
+    --border: #1e2b42;
 
-    --accent: #93a9ff;
-    --on-accent: #0d1017;
-    --warning: #f0a253;
+    --accent: #2ef4ca;
+    --on-accent: #050a16;
+    --warning: #f7b955;
 
-    --tone-posts: #93a9ff;
-    --tone-projects: #f0b45f;
-    --tone-cheatsheets: #4fd6c0;
+    --tone-posts: #00c3ff;
+    --tone-projects: #f7b955;
+    --tone-cheatsheets: #2ef4ca;
+
+    --logo-from: #00c3ff;
+    --logo-mid: #12dbe0;
+    --logo-to: #2ef4ca;
   }
 }
 
 :root[data-theme="dark"] {
-  --background: #0d1017;
-  --surface: #141824;
-  --foreground: #e9ecf2;
-  --muted: #98a1b3;
-  --border: #262b38;
+  --background: #050a16;
+  --surface: #0d1626;
+  --foreground: #e9eef7;
+  --muted: #8d9bb5;
+  --border: #1e2b42;
 
-  --accent: #93a9ff;
-  --on-accent: #0d1017;
-  --warning: #f0a253;
+  --accent: #2ef4ca;
+  --on-accent: #050a16;
+  --warning: #f7b955;
 
-  --tone-posts: #93a9ff;
-  --tone-projects: #f0b45f;
-  --tone-cheatsheets: #4fd6c0;
+  --tone-posts: #00c3ff;
+  --tone-projects: #f7b955;
+  --tone-cheatsheets: #2ef4ca;
+
+  --logo-from: #00c3ff;
+  --logo-mid: #12dbe0;
+  --logo-to: #2ef4ca;
 }
 
 /* Collection tones. Set data-tone={collection} on a wrapper and every

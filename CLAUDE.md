@@ -73,6 +73,15 @@ public/                   static assets served at /
 HowToEdit.mdx             authoring cheat sheet (personal reference, not a page)
 ```
 
+The logo is an SVG path, not a bitmap: `src/components/logo.tsx` draws the mark
+in the header, taking its gradient stops from `--logo-from` / `--logo-mid` /
+`--logo-to` so it can darken for the light theme. `src/app/icon.svg` is the
+favicon (the mark on the logo's navy rounded square, always in the true brand
+colours, since it never sits on a light background) and Next generates the
+`<link rel="icon">` from its filename. `src/app/apple-icon.png` is rendered from
+that same SVG. `public/logo-mark.svg` is the standalone mark for anywhere
+outside the app.
+
 `HowToEdit.mdx` at the repo root is the owner's own reference for writing posts
 — frontmatter fields, image paths, embed syntax, MDX pitfalls. It is deliberately
 outside `content/`, so it is never rendered or published. Keep it in sync when
@@ -148,12 +157,19 @@ workflow — Vercel rebuilds on push.
 ## Conventions
 
 - Path alias `@/*` → `src/*`.
+- **The palette comes from the logo.** Dark mode is the logo's own colours —
+  navy `#050a16` behind turquoise `#2ef4ca` and cyan `#00c3ff`. Light mode is
+  the same hues darkened until they carry AA on white; the logo's turquoise
+  itself sits at 1.4:1 on white and is effectively invisible there, so it can
+  never be used as-is on a light background.
 - Colors come from the CSS variables in `globals.css` (`background`, `surface`,
   `foreground`, `muted`, `border`, `accent`, `on-accent`, `warning`) and are used
   as Tailwind utilities (`text-muted`, `border-border`). **Never hardcode a hex
   value in a component.**
-- **Each collection has its own hue** — `--tone-posts` (blue), `--tone-projects`
-  (amber), `--tone-cheatsheets` (teal). Put `data-tone={collection}` on a
+- **Each collection has its own hue** — `--tone-posts` (the logo's cyan),
+  `--tone-cheatsheets` (the logo's turquoise), and `--tone-projects` (amber,
+  which the logo does not have; three cool hues would be too close to tell
+  apart). Put `data-tone={collection}` on a
   wrapper and every `tone` utility inside it (`text-tone`, `bg-tone`,
   `border-tone`) resolves to that collection's colour. This is what stops the
   site reading as monochrome, and it carries meaning: colour tells you what kind
