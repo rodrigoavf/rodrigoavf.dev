@@ -181,8 +181,13 @@ workflow — Vercel rebuilds on push.
   spans the full container. Add `wide` to new block-level MDX components.
 - Server Components by default; add `"use client"` only where interactivity
   genuinely requires it.
-- Site name, nav, and social links live in `src/lib/site.ts` — edit them there,
-  not inline in components.
+- Site name, role, location, nav, and social links live in `src/lib/site.ts` —
+  edit them there, not inline in components.
+- The About page (`src/app/about/page.tsx`) is plain JSX, not MDX: its content is
+  structured data (roles, skills, certifications) rather than prose, and there is
+  only ever one of it. Update the arrays at the top of the file.
+- **Never put the phone number or postal address from the CV on the site.** The
+  contact route is `<EmailLink>` and LinkedIn, nothing more.
 - **The contact address is stored ROT13-encoded** (`site.emailRot13`) and decoded
   only inside `<EmailLink>`'s click handler, so it is in neither the prerendered
   HTML nor the live DOM. That component is a `<button>`, not an `<a>`, precisely

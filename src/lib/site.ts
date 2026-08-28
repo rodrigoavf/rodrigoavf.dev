@@ -1,14 +1,16 @@
 export const site = {
-  name: "Rodrigo Vaz",
+  name: "Rodrigo Ferreira",
+  role: "Lead Data Analyst / Analytics Engineer",
+  location: "Braga, Portugal",
   domain: "rodrigoavf.dev",
   url: "https://rodrigoavf.dev",
   tagline:
     "Data analysis & data engineering — notes, tutorials, and things I build.",
   description:
-    "Notes, tutorials and projects on data analysis and data engineering by Rodrigo Vaz.",
+    "Notes, tutorials and projects on data analysis and data engineering by Rodrigo Ferreira, a Power BI and Microsoft Fabric consultant in Braga, Portugal.",
   /** Longer blurb under the headline on the home page. */
   intro:
-    "This is a placeholder introduction. A couple of sentences about who you are, what you work on, and what someone can expect to find here.",
+    "I'm a Power BI and Microsoft Fabric consultant with over ten years of experience across Brazil, China and Portugal. This is where I write up what I work out along the way — and keep the references I got tired of looking up twice.",
   nav: [
     { href: "/", label: "Home" },
     { href: "/writing", label: "Writing" },
