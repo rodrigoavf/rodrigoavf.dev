@@ -17,7 +17,7 @@ function Frame({
   ratio?: Ratio;
 }) {
   return (
-    <div className="wide my-8">
+    <div className="my-8">
       <div
         className={`${ratioClass[ratio]} overflow-hidden rounded-xl border border-border bg-surface`}
       >

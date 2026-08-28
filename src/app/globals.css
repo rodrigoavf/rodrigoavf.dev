@@ -34,10 +34,9 @@
   /* The active tone, overridden per element by [data-tone]. */
   --tone: var(--accent);
 
-  /* Layout: the page is this wide; body text is held to a readable measure
-     inside it, while figures, code and tables use the full width. */
+  /* One width for the whole page. Text, figures, code and tables all use it —
+     nothing is held to a narrower column. */
   --container: 64rem;
-  --measure: 42rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -140,28 +139,13 @@ body {
 /* ---------------------------------------------------------------------------
    Article body.
 
-   A grid, so prose sits in a narrow readable column while anything marked
-   .wide (figures, embeds, code blocks, tables) spans the full container.
+   Everything — paragraphs, figures, embeds, code blocks, tables — uses the
+   full container width. There is no narrower text column.
 --------------------------------------------------------------------------- */
 
 .prose {
-  display: grid;
-  /* Text sits in a left-aligned column so it lines up with the page heading;
-     .wide children spill across the full container width to the right. */
-  grid-template-columns:
-    [full-start content-start] min(var(--measure), 100%) [content-end]
-    minmax(0, 1fr) [full-end];
   font-size: 1.0625rem;
   line-height: 1.75;
-}
-
-.prose > * {
-  grid-column: content;
-}
-
-.prose > .wide,
-.prose > figure {
-  grid-column: full;
 }
 
 .prose > * + * {

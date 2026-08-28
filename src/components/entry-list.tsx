@@ -19,7 +19,7 @@ export function EntryList({ entries }: { entries: Entry[] }) {
                 {formatDate(entry.date)}
               </time>
             </div>
-            <p className="mt-1.5 max-w-[var(--measure)] text-sm leading-relaxed text-muted text-pretty">
+            <p className="mt-1.5 text-sm leading-relaxed text-muted text-pretty">
               {entry.summary}
             </p>
             {entry.tags.length > 0 ? (

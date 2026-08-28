@@ -19,7 +19,7 @@ export function PageShell({
         {title}
       </h1>
       {intro ? (
-        <p className="mt-4 max-w-[var(--measure)] leading-relaxed text-muted text-pretty">
+        <p className="mt-4 leading-relaxed text-muted text-pretty">
           {intro}
         </p>
       ) : null}

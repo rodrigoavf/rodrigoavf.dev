@@ -24,7 +24,7 @@ export default function Home() {
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
               {site.tagline}
             </h1>
-            <p className="mt-6 max-w-[var(--measure)] text-lg leading-relaxed text-muted text-pretty">
+            <p className="mt-6 text-lg leading-relaxed text-muted text-pretty">
               {site.intro}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">

@@ -141,7 +141,7 @@ export default function AboutPage() {
       <div className="prose">
         <p>
           My name is Rodrigo Ferreira, I build business intelligence solutions on the Microsoft and Databricks stack — pipelines and automation at one end, semantic models and reports at the other.
-          I've been working with all sort of data solution for over a decade now, across Brazil, China and Europe.
+          I&apos;ve been working with all sort of data solution for over a decade now, across Brazil, China and Europe.
         </p>
         <p>
           I currently consult at <strong>Devoteam</strong>, delivering Power BI
@@ -209,7 +209,7 @@ export default function AboutPage() {
                 <p className="font-mono text-xs text-muted">{role.period}</p>
               </div>
               <p className="mt-0.5 font-mono text-xs text-muted">{role.place}</p>
-              <ul className="mt-3 flex max-w-[var(--measure)] flex-col gap-1.5 text-sm leading-relaxed text-muted">
+              <ul className="mt-3 flex flex-col gap-1.5 text-sm leading-relaxed text-muted">
                 {role.points.map((point) => (
                   <li key={point} className="flex gap-2.5">
                     <span aria-hidden="true" className="text-accent">
@@ -274,7 +274,7 @@ export default function AboutPage() {
       </Section>
 
       <Section title="Get in touch">
-        <p className="max-w-[var(--measure)] text-sm leading-relaxed text-muted text-pretty">
+        <p className="text-sm leading-relaxed text-muted text-pretty">
           Happy to talk about Power BI, Fabric, or anything else on this site.
         </p>
         <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">

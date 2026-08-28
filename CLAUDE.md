@@ -169,16 +169,15 @@ workflow — Vercel rebuilds on push.
   in all three blocks in `globals.css` — bare `:root`, the
   `prefers-color-scheme: dark` block, and `:root[data-theme="dark"]`. Adding a
   colour to only one of them is the easy mistake here.
-- Width comes from two CSS variables in `globals.css`: `--container` (the page,
-  64rem) and `--measure` (the readable text column, 42rem). Use the `<Container>`
-  component rather than setting a max width per page.
+- **There is one width for everything.** `--container` in `globals.css` (64rem)
+  is it — paragraphs, headings, figures, embeds, code blocks and tables all use
+  the same box, so nothing is inset relative to anything else. Use the
+  `<Container>` component rather than setting a max width per page, and do not
+  reintroduce a narrower column for prose.
 - `html` sets `scrollbar-gutter: stable`. **Do not remove it.** Without it, pages
   long enough to scroll (Home, Writing) lose scrollbar width from the viewport
   while short ones (Projects, About) do not, so the centred layout — header
   included — jumps sideways a few pixels as you navigate between them.
-- Inside an article, `.prose` is a grid: text sits in the `--measure` column, and
-  any direct child with the `wide` class (figures, embeds, code blocks, tables)
-  spans the full container. Add `wide` to new block-level MDX components.
 - Server Components by default; add `"use client"` only where interactivity
   genuinely requires it.
 - Site name, role, location, nav, and social links live in `src/lib/site.ts` —

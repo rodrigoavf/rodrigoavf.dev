@@ -15,7 +15,7 @@ export function Figure({
   height?: number;
 }) {
   return (
-    <figure className="wide my-8">
+    <figure className="my-8">
       <Image
         src={src}
         alt={alt}

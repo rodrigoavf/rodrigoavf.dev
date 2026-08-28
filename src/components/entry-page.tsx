@@ -22,11 +22,11 @@ export function EntryPage({ entry, backTo }: { entry: Entry; backTo: { href: str
           </p>
         ) : null}
 
-        <h1 className="max-w-[var(--measure)] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
           {entry.title}
         </h1>
 
-        <p className="mt-4 max-w-[var(--measure)] text-lg leading-relaxed text-muted text-pretty">
+        <p className="mt-4 text-lg leading-relaxed text-muted text-pretty">
           {entry.summary}
         </p>
 

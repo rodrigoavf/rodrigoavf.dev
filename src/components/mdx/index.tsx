@@ -24,7 +24,7 @@ function MdxImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
         src={src}
         alt={alt ?? ""}
         loading="lazy"
-        className="wide my-8 w-full rounded-xl border border-border"
+        className="my-8 w-full rounded-xl border border-border"
       />
     );
   }
@@ -37,7 +37,7 @@ function MdxImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
       width={width}
       height={height}
       sizes="(min-width: 1024px) 1024px, 100vw"
-      className="wide my-8 h-auto w-full rounded-xl border border-border"
+      className="my-8 h-auto w-full rounded-xl border border-border"
     />
   );
 }
@@ -72,7 +72,7 @@ function MdxLink({ href, children, ...props }: ComponentPropsWithoutRef<"a">) {
 /** Code blocks, wrapped so a copy button can sit in the corner. */
 function Pre({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
   return (
-    <div className="wide group relative my-6">
+    <div className="group relative my-6">
       <pre {...props}>{children}</pre>
       <CopyButton />
     </div>
@@ -82,7 +82,7 @@ function Pre({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
 /** Tables scroll sideways on narrow screens rather than breaking the layout. */
 function Table({ children }: { children?: ReactNode }) {
   return (
-    <div className="wide my-6 overflow-x-auto">
+    <div className="my-6 overflow-x-auto">
       <table>{children}</table>
     </div>
   );
