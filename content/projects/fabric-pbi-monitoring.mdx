@@ -1,7 +1,7 @@
 ---
 title: Monitoring every Fabric and Power BI item without being the admin
 date: 2026-08-28
-summary: A PySpark-to-Power-BI pipeline giving a single, filterable view of every item I can see — owner, last refresh, status — with a one-click email to whoever owns something that's failing.
+summary: A PySpark-to-Power-BI pipeline giving a single, filterable view of every item I can see (owner, last refresh, status) with a one-click email to whoever owns something that's failing.
 tags: [power-bi, fabric, data-engineering, power-automate]
 ---
 
@@ -9,7 +9,7 @@ tags: [power-bi, fabric, data-engineering, power-automate]
 
 I am not the Fabric admin or the Power BI admin at the client I work for. I
 just need to know, across everything I can see, what is failing to refresh,
-who owns it, and how long it has been broken — and none of the built-in
+who owns it, and how long it has been broken, and none of the built-in
 options answer that well.
 
 - **OneLake catalog explorer** has most of the fields I need, but filtering
@@ -21,7 +21,7 @@ options answer that well.
   wading through history, and no way to contact an owner from there.
 - **The OneLake Catalog Governance report** (the Power BI report Microsoft
   ships over the governance semantic model) is genuinely the best view of the
-  three — except it only shows items I own. Everything owned by anyone else
+  three, except it only shows items I own. Everything owned by anyone else
   is invisible, which defeats the point of an overview.
 
 None of them give a single filterable surface with a way to act on what it
@@ -31,7 +31,7 @@ shows. So I built one.
 
 A small pipeline that collects everything I have access to across the
 tenant once a day, lands it as a Delta table, and serves it through the same
-modelling layer I'd use for any other report — plus a button that emails the
+modelling layer I'd use for any other report, plus a button that emails the
 owner of anything broken.
 
 | Layer          | Tool                                     |
@@ -46,10 +46,10 @@ owner of anything broken.
 <Figure
   src="/images/posts/fabric-pbi-monitoring/architecture.png"
   alt="Diagram of the pipeline: PySpark notebook writing to a Delta table, read through a SQL analytics endpoint into a semantic model, surfaced in a Power BI report, with a Power Automate flow triggered from the report"
-  caption="Notebook to Delta table to SQL endpoint to semantic model to report — the same shape as any other Fabric pipeline, just aimed at Fabric itself."
+  caption="Notebook to Delta table to SQL endpoint to semantic model to report: the same shape as any other Fabric pipeline, just aimed at Fabric itself."
 />
 
-Nothing here is exotic. That's deliberate — it's the same stack I'd use for
+Nothing here is exotic. That's deliberate: it's the same stack I'd use for
 any other report, which means no new tool to maintain and no extra
 permissions to ask for.
 
@@ -57,12 +57,12 @@ permissions to ask for.
 
 A PySpark notebook runs on a schedule, walks every workspace and item I have
 access to, and pulls owner, item type, workspace, last refresh time and
-refresh status for each. The result gets written to a Delta table —
-append the run, keep history, so "since when has this been failing" is a
-query, not a guess.
+refresh status for each. The result gets written to a Delta table: append
+the run, keep history, so "since when has this been failing" is a query,
+not a guess.
 
 ```python
-# Notebook code goes here — collects workspaces/items visible to the
+# Notebook code goes here. Collects workspaces/items visible to the
 # calling identity via the Fabric/Power BI REST APIs and writes owner,
 # item type, workspace, last refresh time and refresh status to a Delta
 # table, one row per item per collection run.
@@ -70,7 +70,7 @@ query, not a guess.
 
 Landing raw runs rather than overwriting a single "current state" table is
 what makes the failing-since-when question answerable later, and it's also
-what avoids the duplicate-entries problem Monitor Hub has — the report
+what avoids the duplicate-entries problem Monitor Hub has. The report
 below reduces this to one row per item, current status only, with the full
 history sitting underneath for anyone who needs it.
 
@@ -89,7 +89,7 @@ that's been red for more than one refresh cycle.
 />
 
 Filtering on owner, workspace, item type and refresh status is what the
-built-in options couldn't do well — here it's just slicers on a table.
+built-in options couldn't do well. Here it's just slicers on a table.
 
 <Figure
   src="/images/posts/fabric-pbi-monitoring/report-failing.png"
@@ -98,8 +98,8 @@ built-in options couldn't do well — here it's just slicers on a table.
 />
 
 That second page uses a custom visual from the Power BI marketplace that
-renders HTML. A few measures build the email body — a table of the owner's
-failing items, since-when, and a plain ask to look at them — as an HTML
+renders HTML. A few measures build the email body: a table of the owner's
+failing items, since-when, and a plain ask to look at them, as an HTML
 string, and the visual renders it exactly as the recipient will see it
 before anything is sent. Being able to check the wording and formatting in
 the report itself, rather than trusting whatever the flow generates blind,
@@ -126,7 +126,7 @@ Power Automate flow export goes here.
 <Callout type="warning" title="Before embedding the live report">
 This report surfaces real owner names, workspace names and item names from
 the client's tenant. *Publish to web* makes an embed visible to anyone on
-the internet with no login — so before publishing this one, replace the
+the internet with no login, so before publishing this one, replace the
 embed with a version built over sanitised or sample data, the same as any
 other report on this site.
 </Callout>
@@ -141,12 +141,12 @@ Monitor Hub weeks later.
 ## What I would change
 
 - **The trigger is manual.** I open the report and press the button. A
-  scheduled version — collect, evaluate, and send automatically for
-  anything that's been failing more than a day — would close the loop
-  without me in it.
+  scheduled version (collect, evaluate, and send automatically for anything
+  that's been failing more than a day) would close the loop without me in
+  it.
 - **Ownership is only as good as the metadata.** Items with no owner set, or
   owned by a service principal instead of a person, still show up but can't
   be emailed. Those need a manual mapping I maintain by hand right now.
 - **It only sees what I can see.** It's a real improvement over the
-  alternatives, but it's still bounded by my own permissions — an actual
+  alternatives, but it's still bounded by my own permissions. An actual
   admin view would still be better, if it existed.

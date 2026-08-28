@@ -154,6 +154,51 @@ workflow — Vercel rebuilds on push.
   link to it. Only small files (a sample `.csv`, a `.pbix` under a few MB) should
   go in `public/downloads/`.
 
+## Writing style
+
+Applies whenever you're asked to write or edit content for `content/` (posts,
+projects, cheat sheets) — not to this file or other repo docs.
+
+**Nothing that reads as AI-written.** Concretely:
+
+- **No em dashes (`—`).** Rephrase with a period, comma, colon, or
+  parentheses instead.
+- Avoid the "It's not just X, it's Y" construction, and don't lean on
+  rule-of-three lists as a crutch ("fast, reliable, and scalable").
+- Skip stock phrasing: "delve into", "leverage", "robust", "seamless",
+  "unlock", "game-changing", "cutting-edge", "boundless", "navigate the
+  landscape", "in today's fast-paced/digital world", "let's dive in", "in
+  conclusion", "furthermore", "moreover".
+- No meta-commentary about being an AI, a model, or an assistant. Write in
+  the owner's voice, first person, like he sat down and wrote it himself.
+- No filler openers ("In this post, we'll explore...") or filler closers
+  ("In conclusion, ..."). Open on the problem or the point. Stop when the
+  point is made — no restating it in a wrap-up paragraph.
+
+**Tone: professional but conversational** — the way a good Medium technical
+writeup reads, not a corporate blog post and not a textbook. Plain sentences,
+contractions are fine ("it's", "didn't"), first person for projects and
+opinions. Short paragraphs. A dry aside is fine; a forced joke is not.
+
+**Structure**, matching the existing posts and projects: `##` section
+headings (never `#` — the frontmatter `title` already renders as the page's
+`#`), a stated problem, what was built or learned, concrete detail (code, a
+table, real numbers), and an honest closing note on what's still rough or
+what you'd change, rather than a tidy summary paragraph.
+
+**Placeholders.** When an image or a code sample isn't available yet, don't
+skip it or invent fake content to fill the gap — leave an obvious
+placeholder:
+
+- **Images:** use `<Figure>` (or plain `![alt](...)`) pointing at the real
+  eventual path under `/images/posts/<slug>/`, with specific alt text and a
+  caption describing what the image will show. The file doesn't need to
+  exist yet — a missing image never fails the build.
+- **Code or config supplied later** (real notebook code, a flow export, a
+  full file): a fenced code block with one comment line saying what belongs
+  there, e.g. `# Paste the PySpark notebook code here — collects X, writes Y
+  to Z`. Never pass off invented code as the real implementation.
+
 ## Conventions
 
 - Path alias `@/*` → `src/*`.
