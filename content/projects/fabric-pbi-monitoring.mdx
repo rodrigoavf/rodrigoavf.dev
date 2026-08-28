@@ -7,10 +7,10 @@ tags: [power-bi, fabric, data-engineering, power-automate]
 
 ## The problem
 
-I am not the Fabric admin or the Power BI admin at the client I work for. I
-just need to know, across everything I can see, what is failing to refresh,
-who owns it, and how long it has been broken, and none of the built-in
-options answer that well.
+Tracking everything in Fabric is difficult, especially when you're not a Fabric admin or the Power BI admin.
+While working for a client, I noticed that in many of their workspaces, numerous items were failing to refresh. Some had been failing for over two years, yet no one seemed to care about fixing or deleting them.
+That annoyed me, and I wanted to fix it. I wanted to know, across everything I could see, what was failing to refresh, who owned it, and how long it had been broken, so I could nudge the owner to take action.
+Unfortunately, none of the built-in options answer that need well.
 
 - **OneLake catalog explorer** has most of the fields I need, but filtering
   is shallow and there is no way to see everything at once. You browse one
@@ -24,14 +24,13 @@ options answer that well.
   three, except it only shows items I own. Everything owned by anyone else
   is invisible, which defeats the point of an overview.
 
-None of them give a single filterable surface with a way to act on what it
-shows. So I built one.
+None of them give a single really useful filterable surface with a way to act on what it shows. So I built one.
 
 ## What I built
 
 A small pipeline that collects everything I have access to across the
-tenant once a day, lands it as a Delta table, and serves it through the same
-modelling layer I'd use for any other report, plus a button that emails the
+tenant, lands it as a Delta table, and serves it through the same
+modelling layer I'd use for a regular PBI report, plus a button that emails the
 owner of anything broken.
 
 | Layer          | Tool                                     |
@@ -62,10 +61,475 @@ the run, keep history, so "since when has this been failing" is a query,
 not a guess.
 
 ```python
-# Notebook code goes here. Collects workspaces/items visible to the
-# calling identity via the Fabric/Power BI REST APIs and writes owner,
-# item type, workspace, last refresh time and refresh status to a Delta
-# table, one row per item per collection run.
+import base64
+import json
+import requests
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pandas as pd
+import sempy.fabric as fabric
+from sempy.fabric import PowerBIRestClient
+from pyspark.sql.functions import col
+from pyspark.sql.types import BooleanType, TimestampType
+
+try:
+    from notebookutils import mssparkutils
+except ImportError:
+    mssparkutils = None
+
+
+def get_notebook_user():
+    """Extracts the logged-in user's Entra ID email/UPN by parsing the bearer JWT access token."""
+    if mssparkutils:
+        try:
+            token = mssparkutils.credentials.getToken("pbi")
+            if token:
+                payload_b64 = token.split(".")[1]
+                payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+                payload = json.loads(base64.b64decode(payload_b64).decode("utf-8"))
+
+                user_identity = (
+                    payload.get("upn")
+                    or payload.get("email")
+                    or payload.get("preferred_username")
+                    or payload.get("unique_name")
+                )
+                if user_identity:
+                    return str(user_identity).lower().strip()
+        except Exception:
+            pass
+
+        try:
+            user_email = mssparkutils.env.getUserEmail()
+            if user_email and user_email != "trusted-service-user":
+                return user_email
+        except Exception:
+            pass
+
+    return "UnknownUser"
+
+
+def get_graph_token():
+    """Fetches Microsoft Graph API token using mssparkutils."""
+    if mssparkutils:
+        try:
+            return mssparkutils.credentials.getToken("https://graph.microsoft.com/")
+        except Exception:
+            return None
+    return None
+
+
+def resolve_graph_user_emails(owner_list, graph_token):
+    """Queries Microsoft Graph API to map User IDs/UPNs to primary mail and display name."""
+    user_map = {}
+    if not graph_token or not owner_list:
+        return user_map
+
+    headers = {"Authorization": f"Bearer {graph_token}"}
+    unique_owners = {str(o).strip() for o in owner_list if pd.notna(o)}
+
+    for owner in unique_owners:
+        owner_key = owner.lower()
+        if owner_key in ["none", "nan", "<na>"]:
+            continue
+
+        url = f"https://graph.microsoft.com/v1.0/users/{owner}?$select=mail,userPrincipalName,displayName"
+        try:
+            resp = requests.get(url, headers=headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                mail = data.get("mail") or data.get("userPrincipalName")
+                if mail:
+                    user_map[owner_key] = {
+                        "email": mail,
+                        "name": data.get("displayName"),
+                    }
+        except Exception:
+            pass
+
+    return user_map
+
+
+def process_workspace(ws_row, pbi_client):
+    """Extracts metadata for a single workspace, resolving workspace admins and item attributes."""
+    ws_id = ws_row["Id"]
+    ws_name = ws_row.get("Name", ws_row.get("Workspace Name", "Unknown Workspace"))
+
+    fabric_token = None
+    if mssparkutils:
+        try:
+            fabric_token = mssparkutils.credentials.getToken("pbi")
+        except Exception:
+            pass
+
+    try:
+        user_name_map = {}
+        user_email_map = {}
+        primary_ws_admin = None
+        ws_admin_names = []
+        ws_admin_emails = []
+
+        # 1. Map Workspace Access Users & Workspace Admins
+        try:
+            users_resp = pbi_client.get(f"v1.0/myorg/groups/{ws_id}/users")
+            if users_resp.status_code == 200:
+                for u in users_resp.json().get("value", []):
+                    d_name = u.get("displayName")
+                    email_addr = u.get("emailAddress")
+                    ident = u.get("identifier")
+                    role = u.get("groupUserAccessRight")
+
+                    for key in filter(None, [ident, email_addr]):
+                        clean_key = str(key).lower().strip()
+                        if d_name:
+                            user_name_map[clean_key] = d_name
+                        if email_addr:
+                            user_email_map[clean_key] = email_addr
+
+                    if not primary_ws_admin and role in ["Admin", "Member"]:
+                        primary_ws_admin = email_addr or ident
+
+                    if role == "Admin":
+                        if d_name and d_name not in ws_admin_names:
+                            ws_admin_names.append(d_name)
+                        admin_identifier = email_addr or ident
+                        if admin_identifier and admin_identifier not in ws_admin_emails:
+                            ws_admin_emails.append(admin_identifier)
+        except Exception:
+            pass
+
+        ws_admins_str = "; ".join(ws_admin_names) if ws_admin_names else None
+        ws_admin_emails_str = "; ".join(ws_admin_emails) if ws_admin_emails else None
+
+        # 2. Extract Workspace Base Items
+        df_items = fabric.list_items(workspace=ws_id)
+        if df_items.empty:
+            df_items = pd.DataFrame(
+                columns=["Id", "Name", "DisplayName", "Description", "Type", "FolderId"]
+            )
+        else:
+            df_items.columns = [c.replace(" ", "") for c in df_items.columns]
+            name_col = next(
+                (c for c in ["DisplayName", "Name", "ItemName"] if c in df_items.columns),
+                None,
+            )
+            item_name = df_items[name_col] if name_col else "Unknown"
+            df_items["Name"] = item_name
+            df_items["DisplayName"] = item_name
+
+            for col_name in ["Description", "FolderId", "Type", "Id"]:
+                if col_name not in df_items.columns:
+                    df_items[col_name] = None
+
+        df_items["WorkspaceId"] = ws_id
+        df_items["WorkspaceName"] = ws_name
+        df_items["WorkspaceAdmins"] = ws_admins_str
+        df_items["WorkspaceAdminEmails"] = ws_admin_emails_str
+        df_items["Owner"] = None
+        df_items["OwnerEmail"] = None
+        df_items["OwnerName"] = None
+        df_items["LastRefreshTime"] = None
+        df_items["LastRefreshStatus"] = None
+
+        # 3. Fetch Gen1 Dataflows
+        try:
+            df_resp = pbi_client.get(f"v1.0/myorg/groups/{ws_id}/dataflows")
+            if df_resp.status_code == 200:
+                gen1_dataflows = df_resp.json().get("value", [])
+                df_list = []
+                for df in gen1_dataflows:
+                    df_id = df.get("objectId")
+                    df_owner = df.get("configuredBy")
+                    owner_key = str(df_owner).lower().strip() if df_owner else None
+
+                    ref_time, ref_status = None, None
+                    try:
+                        tx_resp = pbi_client.get(
+                            f"v1.0/myorg/groups/{ws_id}/dataflows/{df_id}/transactions"
+                        )
+                        if tx_resp.status_code == 200:
+                            txs = tx_resp.json().get("value", [])
+                            if txs:
+                                latest_tx = txs[0]
+                                ref_time = latest_tx.get("endTime", latest_tx.get("startTime"))
+                                ref_status = latest_tx.get("status")
+                    except Exception:
+                        pass
+
+                    df_list.append({
+                        "Id": df_id,
+                        "Name": df.get("name"),
+                        "DisplayName": df.get("name"),
+                        "Description": df.get("description"),
+                        "Type": "DataflowGen1",
+                        "WorkspaceId": ws_id,
+                        "WorkspaceName": ws_name,
+                        "WorkspaceAdmins": ws_admins_str,
+                        "WorkspaceAdminEmails": ws_admin_emails_str,
+                        "FolderId": df.get("folderId"),
+                        "Owner": df_owner,
+                        "OwnerEmail": user_email_map.get(owner_key) if owner_key else None,
+                        "OwnerName": user_name_map.get(owner_key) if owner_key else None,
+                        "LastRefreshTime": ref_time,
+                        "LastRefreshStatus": ref_status,
+                    })
+                if df_list:
+                    df_items = pd.concat([df_items, pd.DataFrame(df_list)], ignore_index=True)
+        except Exception:
+            pass
+
+        if df_items.empty or df_items["Id"].isna().all():
+            return None
+
+        # 4. Fetch Dataset Metadata & Refreshes
+        try:
+            ds_resp = pbi_client.get(f"v1.0/myorg/groups/{ws_id}/datasets")
+            if ds_resp.status_code == 200:
+                datasets = ds_resp.json().get("value", [])
+                dataset_dict = {}
+                for ds in datasets:
+                    ds_id = str(ds.get("id")).strip().lower()
+                    owner_login = ds.get("configuredBy")
+                    owner_key = str(owner_login).lower().strip() if owner_login else None
+
+                    ref_time, ref_status = None, None
+                    if ds.get("isRefreshable"):
+                        try:
+                            ref_resp = pbi_client.get(
+                                f"v1.0/myorg/groups/{ws_id}/datasets/{ds_id}/refreshes?$top=1"
+                            )
+                            if ref_resp.status_code == 200:
+                                refreshes = ref_resp.json().get("value", [])
+                                if refreshes:
+                                    latest = refreshes[0]
+                                    ref_time = latest.get("endTime", latest.get("startTime"))
+                                    ref_status = latest.get("status")
+                        except Exception:
+                            pass
+
+                    dataset_dict[ds_id] = {
+                        "owner": owner_login,
+                        "owner_email": user_email_map.get(owner_key),
+                        "owner_name": user_name_map.get(owner_key),
+                        "refresh_time": ref_time,
+                        "refresh_status": ref_status,
+                    }
+
+                clean_ids = df_items["Id"].astype(str).str.strip().str.lower()
+                for idx, ds_id in enumerate(clean_ids):
+                    if ds_id in dataset_dict:
+                        info = dataset_dict[ds_id]
+                        df_items.loc[idx, "Owner"] = info["owner"]
+                        df_items.loc[idx, "OwnerEmail"] = info["owner_email"]
+                        df_items.loc[idx, "OwnerName"] = info["owner_name"]
+                        df_items.loc[idx, "LastRefreshTime"] = info["refresh_time"]
+                        df_items.loc[idx, "LastRefreshStatus"] = info["refresh_status"]
+        except Exception:
+            pass
+
+        # 5. Resolve Job Executions & Fallback Owners for Fabric Native Items
+        job_types = ["datapipeline", "notebook", "dataflow", "dataflowgen2", "lakehouse"]
+        headers = {"Authorization": f"Bearer {fabric_token}"} if fabric_token else None
+        admin_key = str(primary_ws_admin).lower().strip() if primary_ws_admin else None
+
+        for idx in df_items.index:
+            item_id = df_items.loc[idx, "Id"]
+            item_type = str(df_items.loc[idx, "Type"]).lower()
+
+            # Apply Workspace Admin fallback if missing Owner
+            if pd.isna(df_items.loc[idx, "Owner"]) or not df_items.loc[idx, "Owner"]:
+                df_items.loc[idx, "Owner"] = primary_ws_admin
+                df_items.loc[idx, "OwnerEmail"] = user_email_map.get(admin_key, primary_ws_admin)
+                df_items.loc[idx, "OwnerName"] = user_name_map.get(admin_key)
+
+            # Query Job Instances API for refresh details
+            if headers and any(jt in item_type for jt in job_types) and item_id:
+                try:
+                    job_url = f"https://api.fabric.microsoft.com/v1/workspaces/{ws_id}/items/{item_id}/jobs/instances"
+                    job_resp = requests.get(job_url, headers=headers, timeout=3)
+                    if job_resp.status_code == 200:
+                        instances = job_resp.json().get("value", [])
+                        if instances:
+                            exec_time = instances[0].get("endTime") or instances[0].get("startTime")
+                            df_items.loc[idx, "LastRefreshTime"] = exec_time
+                            df_items.loc[idx, "LastRefreshStatus"] = instances[0].get("status")
+                except Exception:
+                    pass
+
+        # Flag System Items
+        model_names = ["Report Usage Metrics Model", "Usage Metrics Report"]
+        df_items["IsSystemItem"] = df_items["Name"].apply(
+            lambda x: any(kw.lower() in str(x).lower() for kw in model_names)
+        )
+
+        return df_items
+    except Exception:
+        return None
+
+
+# Main Execution Block
+try:
+    pbi_client = PowerBIRestClient()
+    df_workspaces = fabric.list_workspaces()
+    all_items = []
+    run_timestamp = datetime.now()
+    current_notebook_user = get_notebook_user()
+
+    # Parallelize workspace retrieval across 10 threads
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [
+            executor.submit(process_workspace, row, pbi_client)
+            for _, row in df_workspaces.iterrows()
+        ]
+        for future in as_completed(futures):
+            res = future.result()
+            if res is not None and not res.empty:
+                all_items.append(res)
+
+    if all_items:
+        df_catalog = pd.concat(all_items, ignore_index=True)
+        df_catalog = df_catalog.loc[:, ~df_catalog.columns.duplicated()]
+        df_catalog["ExecutionTimestamp"] = run_timestamp
+        df_catalog["NotebookUser"] = current_notebook_user
+
+        # Microsoft Graph API Resolution for primary user emails
+        graph_token = get_graph_token()
+        if graph_token and "Owner" in df_catalog.columns:
+            graph_user_map = resolve_graph_user_emails(
+                df_catalog["Owner"].dropna().unique(), graph_token
+            )
+
+            for idx in df_catalog.index:
+                owner_val = df_catalog.loc[idx, "Owner"]
+                if pd.notna(owner_val):
+                    key = str(owner_val).lower().strip()
+                    if key in graph_user_map:
+                        if pd.isna(df_catalog.loc[idx, "OwnerEmail"]) or not df_catalog.loc[idx, "OwnerEmail"]:
+                            df_catalog.loc[idx, "OwnerEmail"] = graph_user_map[key]["email"]
+                        if pd.isna(df_catalog.loc[idx, "OwnerName"]) or not df_catalog.loc[idx, "OwnerName"]:
+                            df_catalog.loc[idx, "OwnerName"] = graph_user_map[key]["name"]
+
+        # Safe Fallbacks & Coalesce
+        if "OwnerEmail" in df_catalog.columns and "Owner" in df_catalog.columns:
+            df_catalog["OwnerEmail"] = df_catalog["OwnerEmail"].replace("", None)
+            is_valid_email = df_catalog["Owner"].astype(str).str.contains("@", na=False)
+            df_catalog.loc[df_catalog["OwnerEmail"].isna() & is_valid_email, "OwnerEmail"] = df_catalog["Owner"]
+
+        if "OwnerName" in df_catalog.columns and "OwnerEmail" in df_catalog.columns:
+            df_catalog["OwnerName"] = df_catalog["OwnerName"].replace("", None).fillna(df_catalog["OwnerEmail"])
+
+        # Vectorized Item Link Generation
+        type_map = {
+            "semanticmodel": "datasets",
+            "dataset": "datasets",
+            "datapipeline": "pipelines",
+            "pipeline": "pipelines",
+            "dataflowgen1": "dataflows",
+            "dataflowgen2": "dataflows",
+            "dataflow": "dataflows",
+            "sqlendpoint": "sqlendpoints",
+            "sqldatabasedefinition": "sqldatabasedefinitions",
+        }
+        item_type_clean = df_catalog["Type"].astype(str).str.strip().str.lower()
+        path_type = item_type_clean.map(type_map).fillna(
+            item_type_clean.apply(lambda x: x if x.endswith("s") else x + "s")
+        )
+
+        df_catalog["ItemLink"] = (
+            "https://app.fabric.microsoft.com/groups/"
+            + df_catalog["WorkspaceId"].astype(str)
+            + "/"
+            + path_type
+            + "/"
+            + df_catalog["Id"].astype(str)
+        )
+        invalid_link = (
+            df_catalog["WorkspaceId"].isna()
+            | df_catalog["Id"].isna()
+            | (df_catalog["Id"].astype(str).str.lower() == "none")
+        )
+        df_catalog.loc[invalid_link, "ItemLink"] = None
+
+        # Vectorized Status Cleaning
+        if "LastRefreshStatus" in df_catalog.columns:
+            s = df_catalog["LastRefreshStatus"].astype(str).str.strip()
+            null_mask = df_catalog["LastRefreshStatus"].isna() | s.str.lower().isin(["none", "nan", "<na>"])
+
+            cond_22 = s == "22"
+            cond_cancel = s.str.lower().str.startswith("cancelled")
+            cond_disabled = s.str.lower().str.startswith("disabled")
+
+            df_catalog["LastRefreshStatus"] = np.select(
+                [cond_22, cond_cancel, cond_disabled, null_mask],
+                ["Unknown", "Cancelled", "Disabled", None],
+                default=s,
+            )
+
+        # Derive Owner Type (If WorkspaceId = OwnerEmail then Group else Person)
+        ws_clean = df_catalog["WorkspaceId"].fillna("").astype(str).str.strip().str.lower()
+        owner_email_clean = df_catalog["OwnerEmail"].fillna("").astype(str).str.strip().str.lower()
+
+        df_catalog["OwnerType"] = np.where(
+            (ws_clean == owner_email_clean) & (ws_clean != ""),
+            "Group",
+            "Person",
+        )
+
+        # Datetime Conversions
+        for col_name in ["LastRefreshTime", "ExecutionTimestamp"]:
+            if col_name in df_catalog.columns:
+                df_catalog[col_name] = pd.to_datetime(df_catalog[col_name], errors="coerce")
+
+        # Explicitly remove unwanted columns if present
+        target_drop_cols = [
+            "LastUpdatedDate",
+            "OwnerSource",
+            "TotalViews",
+            "LastExecutionTime",
+            "LastExecutionStatus",
+        ]
+        df_catalog = df_catalog.drop(
+            columns=[c for c in target_drop_cols if c in df_catalog.columns]
+        )
+
+        # Convert to PySpark & Cast Schema
+        spark_df = spark.createDataFrame(df_catalog)
+
+        for col_name in ["ExecutionTimestamp", "LastRefreshTime"]:
+            if col_name in spark_df.columns:
+                spark_df = spark_df.withColumn(col_name, col(col_name).cast(TimestampType()))
+
+        if "IsSystemItem" in spark_df.columns:
+            spark_df = spark_df.withColumn("IsSystemItem", col("IsSystemItem").cast(BooleanType()))
+
+        # Reconcile Multi-User Runs against Existing Delta Table
+        table_name = "Catalog_Inventory_Analysis"
+        try:
+            existing_df = spark.read.table(table_name)
+            other_users_df = existing_df.filter(col("NotebookUser") != current_notebook_user)
+            preserved_df = other_users_df.join(
+                spark_df.select("WorkspaceId", "Id"),
+                on=["WorkspaceId", "Id"],
+                how="left_anti",
+            )
+            final_df = preserved_df.unionByName(spark_df, allowMissingColumns=True)
+        except Exception:
+            final_df = spark_df
+
+        # Save to Delta Table
+        final_df.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(table_name)
+
+        print(
+            f"SUCCESS: Catalog refreshed by user '{current_notebook_user}'. Processed {len(df_catalog)} active items."
+        )
+        display(final_df)
+    else:
+        print("FAILED: No items were extracted or processed.")
+
+except Exception as global_err:
+    print(f"FAILED: Script execution encountered a critical error: {global_err}")
 ```
 
 Landing raw runs rather than overwriting a single "current state" table is
@@ -109,9 +573,9 @@ was worth the extra visual.
 
 A button on the report triggers a Power Automate cloud flow (the standard
 Power Automate visual, wired to the current filter context). The flow takes
-the filtered set of failing items, groups them by owner, and sends each
-owner the email previewed on the page above, asking them to look at what's
+the filtered set of failing items for the selected owner, and sends them the email previewed on the page above, asking them to look at what's
 broken.
+The email body, subject and recipient are obtained by PBI measures, some of wich output HTML code that is viewed in the dedicated HTML visuals and used in the email body, so it looks nice.
 
 <Figure
   src="/images/posts/fabric-pbi-monitoring/power-automate-flow.png"
@@ -119,12 +583,45 @@ broken.
   caption="Triggered from the report, one email per owner, built from the same HTML the report already previewed."
 />
 
-```text
-Power Automate flow export goes here.
-```
+Here are all the steps needed to recreate the Power Automate Cloud Flow I have.
+Step 1: Set Up the Flow & Trigger
+- Log in to Power Automate.
+- Click + Create > Automated cloud flow (or edit directly inside the Power Automate visual in Power BI Desktop).
+- Search for Power BI and select the trigger: On Power BI button clicked.
+- Name the flow: Catalog Inventory Analysis - Email.
+
+Step 2: Add an "Apply to each" Loop
+- Click + New step (or the + icon below the trigger block).
+- Search for Control and select Apply to each.
+- Click into the Select an output from previous steps field.
+- Select Power BI values from the Dynamic Content menu (Expression: @triggerBody()?['entity']?['Power BI values']).
+
+Step 3: Add the Filter Condition
+- Inside the Apply to each container, click Add an action.
+- Search for Control and select Condition.
+
+Build the logic rule:
+- Left value: Select PA_Owner from Dynamic Content (Expression: items('Apply_to_each')?['PA_Owner']).
+- Operator: Select contains.
+- Right value: Type NO_EMAIL.
+
+Step 4: Configure the Email Action
+- Leave the If yes (True) branch empty so records marked NO_EMAIL are skipped.
+- Under the If no (False) branch, click Add an action.
+- Search for Office 365 Outlook and select Send an email (V2).
+
+Map the parameters using Dynamic Content:
+- To: Select PA_Owner
+- Subject: Select PA_Email_Subject
+- Body: Select PA_Email_Body
+- Importance: Set to Normal
+
+Step 5: Save and Connect to Power BI
+- Click Save in the top right corner.
+- Ensure your Power BI report visual feeds the fields PA_Owner, PA_Email_Subject, and PA_Email_Body into the Power Automate data well so the variables populate dynamically during runtime.
 
 <Callout type="warning" title="Before embedding the live report">
-This report surfaces real owner names, workspace names and item names from
+This report surfaces real owner names, workspace names, item names, a direct link to each item and much more from
 the client's tenant. *Publish to web* makes an embed visible to anyone on
 the internet with no login, so before publishing this one, replace the
 embed with a version built over sanitised or sample data, the same as any
@@ -133,10 +630,10 @@ other report on this site.
 
 ## The result
 
-Three tools became one page: everything I can see, one row per item
-current status, filterable by owner and workspace, with a button that tells
+A clean Power BI report with everything I need, one row per item
+latest refresh date and status, filterable by owner, workspace, item type, date, and more, with a button that tells
 the right person their thing is broken instead of me finding it by chance in
-Monitor Hub weeks later.
+Monitor Hub.
 
 ## What I would change
 
@@ -149,4 +646,4 @@ Monitor Hub weeks later.
   be emailed. Those need a manual mapping I maintain by hand right now.
 - **It only sees what I can see.** It's a real improvement over the
   alternatives, but it's still bounded by my own permissions. An actual
-  admin view would still be better, if it existed.
+  admin view would still be better, if it existed. But still, the notebook PySpark code is written in such way that if a colleague with different accesses then me were to run the same notebook the resulting table would accumulate what I see and what my collegue sees, and the final Power BI report would have information on all things both of us have access to.
