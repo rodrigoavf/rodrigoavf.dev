@@ -59,8 +59,7 @@ permissions to ask for.
 A PySpark notebook runs on a schedule, walks every workspace and item I have
 access to, and pulls owner, item type, workspace, last refresh time and
 refresh status for each. The result gets written to a Delta table: append
-the run, keep history, so "since when has this been failing" is a query,
-not a guess.
+the run, keep history, so if a collegue runs the notebook instead of me, the items he has access and I don't get added to the table without removing items I have access to and my collegue does not.
 
 ```python
 import base64
