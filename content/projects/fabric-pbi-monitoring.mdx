@@ -1,0 +1,152 @@
+---
+title: Monitoring every Fabric and Power BI item without being the admin
+date: 2026-08-28
+summary: A PySpark-to-Power-BI pipeline giving a single, filterable view of every item I can see — owner, last refresh, status — with a one-click email to whoever owns something that's failing.
+tags: [power-bi, fabric, data-engineering, power-automate]
+---
+
+## The problem
+
+I am not the Fabric admin or the Power BI admin at the client I work for. I
+just need to know, across everything I can see, what is failing to refresh,
+who owns it, and how long it has been broken — and none of the built-in
+options answer that well.
+
+- **OneLake catalog explorer** has most of the fields I need, but filtering
+  is shallow and there is no way to see everything at once. You browse one
+  item at a time.
+- **Fabric Monitor Hub** is closer to what I want, but it's a run log, not an
+  inventory: every refresh is a new row, so the same report can appear a
+  dozen times a day. There's no way to ask "what is broken right now" without
+  wading through history, and no way to contact an owner from there.
+- **The OneLake Catalog Governance report** (the Power BI report Microsoft
+  ships over the governance semantic model) is genuinely the best view of the
+  three — except it only shows items I own. Everything owned by anyone else
+  is invisible, which defeats the point of an overview.
+
+None of them give a single filterable surface with a way to act on what it
+shows. So I built one.
+
+## What I built
+
+A small pipeline that collects everything I have access to across the
+tenant once a day, lands it as a Delta table, and serves it through the same
+modelling layer I'd use for any other report — plus a button that emails the
+owner of anything broken.
+
+| Layer          | Tool                                     |
+| -------------- | ----------------------------------------- |
+| Collection     | PySpark notebook (Fabric)                 |
+| Storage        | Delta table                               |
+| Query layer    | SQL analytics endpoint                    |
+| Model          | Power BI semantic model                   |
+| Report         | Power BI, with an HTML-content visual      |
+| Notification   | Power Automate cloud flow, triggered from the report |
+
+<Figure
+  src="/images/posts/fabric-pbi-monitoring/architecture.png"
+  alt="Diagram of the pipeline: PySpark notebook writing to a Delta table, read through a SQL analytics endpoint into a semantic model, surfaced in a Power BI report, with a Power Automate flow triggered from the report"
+  caption="Notebook to Delta table to SQL endpoint to semantic model to report — the same shape as any other Fabric pipeline, just aimed at Fabric itself."
+/>
+
+Nothing here is exotic. That's deliberate — it's the same stack I'd use for
+any other report, which means no new tool to maintain and no extra
+permissions to ask for.
+
+## Collecting the inventory
+
+A PySpark notebook runs on a schedule, walks every workspace and item I have
+access to, and pulls owner, item type, workspace, last refresh time and
+refresh status for each. The result gets written to a Delta table —
+append the run, keep history, so "since when has this been failing" is a
+query, not a guess.
+
+```python
+# Notebook code goes here — collects workspaces/items visible to the
+# calling identity via the Fabric/Power BI REST APIs and writes owner,
+# item type, workspace, last refresh time and refresh status to a Delta
+# table, one row per item per collection run.
+```
+
+Landing raw runs rather than overwriting a single "current state" table is
+what makes the failing-since-when question answerable later, and it's also
+what avoids the duplicate-entries problem Monitor Hub has — the report
+below reduces this to one row per item, current status only, with the full
+history sitting underneath for anyone who needs it.
+
+## From Delta table to report
+
+The SQL analytics endpoint reads the Delta table directly, so there's no
+separate export or copy step. The semantic model on top adds the usual
+things a raw log doesn't have: a "current status" measure per item (last run
+only, not every run), days-since-last-success, and a flag for anything
+that's been red for more than one refresh cycle.
+
+<Figure
+  src="/images/posts/fabric-pbi-monitoring/report-overview.png"
+  alt="Power BI report page showing a filterable table of Fabric items with columns for owner, workspace, item type, last refresh and refresh status"
+  caption="Everything I have access to, one row per item, filterable by owner, workspace, item type and status."
+/>
+
+Filtering on owner, workspace, item type and refresh status is what the
+built-in options couldn't do well — here it's just slicers on a table.
+
+<Figure
+  src="/images/posts/fabric-pbi-monitoring/report-failing.png"
+  alt="Power BI report page filtered to items with a failed refresh status, showing how long each has been failing and an HTML-rendered preview of the email that will be sent"
+  caption="Filtered to failures, with the HTML-content visual previewing the email each owner is about to get."
+/>
+
+That second page uses a custom visual from the Power BI marketplace that
+renders HTML. A few measures build the email body — a table of the owner's
+failing items, since-when, and a plain ask to look at them — as an HTML
+string, and the visual renders it exactly as the recipient will see it
+before anything is sent. Being able to check the wording and formatting in
+the report itself, rather than trusting whatever the flow generates blind,
+was worth the extra visual.
+
+## Closing the loop: notifying owners
+
+A button on the report triggers a Power Automate cloud flow (the standard
+Power Automate visual, wired to the current filter context). The flow takes
+the filtered set of failing items, groups them by owner, and sends each
+owner the email previewed on the page above, asking them to look at what's
+broken.
+
+<Figure
+  src="/images/posts/fabric-pbi-monitoring/power-automate-flow.png"
+  alt="Power Automate cloud flow diagram: triggered from the Power BI report, grouping failing items by owner and sending each owner an email"
+  caption="Triggered from the report, one email per owner, built from the same HTML the report already previewed."
+/>
+
+```text
+Power Automate flow export goes here.
+```
+
+<Callout type="warning" title="Before embedding the live report">
+This report surfaces real owner names, workspace names and item names from
+the client's tenant. *Publish to web* makes an embed visible to anyone on
+the internet with no login — so before publishing this one, replace the
+embed with a version built over sanitised or sample data, the same as any
+other report on this site.
+</Callout>
+
+## The result
+
+Three tools became one page: everything I can see, one row per item
+current status, filterable by owner and workspace, with a button that tells
+the right person their thing is broken instead of me finding it by chance in
+Monitor Hub weeks later.
+
+## What I would change
+
+- **The trigger is manual.** I open the report and press the button. A
+  scheduled version — collect, evaluate, and send automatically for
+  anything that's been failing more than a day — would close the loop
+  without me in it.
+- **Ownership is only as good as the metadata.** Items with no owner set, or
+  owned by a service principal instead of a person, still show up but can't
+  be emailed. Those need a manual mapping I maintain by hand right now.
+- **It only sees what I can see.** It's a real improvement over the
+  alternatives, but it's still bounded by my own permissions — an actual
+  admin view would still be better, if it existed.
