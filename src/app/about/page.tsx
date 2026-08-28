@@ -140,7 +140,7 @@ export default function AboutPage() {
     >
       <div className="prose">
         <p>
-          My name if Rodrigo Ferreira, I build business intelligence solutions on the Microsoft and Databricks stack — pipelines and automation at one end, semantic models and reports at the other. Ten years of it now, across Brazil, China and Portugal.
+          My name is Rodrigo Ferreira, I build business intelligence solutions on the Microsoft and Databricks stack — pipelines and automation at one end, semantic models and reports at the other. Ten years of it now, across Brazil, China and Portugal.
         </p>
         <p>
           I currently consult at <strong>Devoteam</strong>, delivering Power BI
