@@ -14,7 +14,7 @@ export const site = {
   ],
   social: [
     { href: "https://github.com/rodrigoavf", label: "GitHub" },
-    { href: "https://www.linkedin.com/", label: "LinkedIn" },
+    { href: "https://www.linkedin.com/in/rodrigoavf/", label: "LinkedIn" },
     { href: "mailto:hello@rodrigoavf.dev", label: "Email" },
   ],
 } as const;
