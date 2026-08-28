@@ -140,15 +140,13 @@ export default function AboutPage() {
     >
       <div className="prose">
         <p>
-          I build business intelligence solutions on the Microsoft stack —
-          pipelines and automation at one end, semantic models and reports at
-          the other. Ten years of it now, across Brazil, China and Portugal.
+          My name if Rodrigo Ferreira, I build business intelligence solutions on the Microsoft and Databricks stack — pipelines and automation at one end, semantic models and reports at the other. Ten years of it now, across Brazil, China and Portugal.
         </p>
         <p>
           I currently consult at <strong>Devoteam</strong>, delivering Power BI
           and Microsoft Fabric work for international clients. Before that I
           modernised reporting at Serasa Experian, and spent nearly four years
-          in southern China building a manufacturer&apos;s first data
+          in southern China building Mous&apos; first data
           infrastructure from scratch — which is where I learned that the
           hardest part of analytics is usually not the analytics.
         </p>
@@ -163,8 +161,8 @@ export default function AboutPage() {
           >
             Função Excel
           </a>
-          , a Portuguese-language Excel tutorial site and channel I have run
-          since 2015 — 140+ articles and an audience of around 18,000
+          , a Portuguese-language Excel tutorial site and YouTube channel I ran
+          from 2015 to early 2026 — 140+ articles and an audience of around 18,000
           subscribers.
         </p>
         <p>
