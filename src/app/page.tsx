@@ -1,58 +1,23 @@
 import Link from "next/link";
+import { Container } from "@/components/container";
+import { EntryCards, EntryList } from "@/components/entry-list";
+import { EmptyState } from "@/components/page-shell";
+import { getEntries } from "@/lib/content";
 import { site } from "@/lib/site";
 
-// Placeholder data. Replace with posts loaded from `content/` once the
-// MDX pipeline lands — see CLAUDE.md.
-const placeholderPosts = [
-  {
-    slug: "#",
-    title: "Placeholder: a post about data modelling",
-    date: "Coming soon",
-    summary:
-      "Short one- or two-line summary of the post, pulled from the MDX frontmatter.",
-    tags: ["placeholder"],
-  },
-  {
-    slug: "#",
-    title: "Placeholder: a tutorial with a Power BI embed",
-    date: "Coming soon",
-    summary:
-      "Walkthroughs, screenshots, embedded reports and downloadable sample files live here.",
-    tags: ["placeholder"],
-  },
-  {
-    slug: "#",
-    title: "Placeholder: a short note on something I found interesting",
-    date: "Coming soon",
-    summary: "Not everything needs to be a full tutorial.",
-    tags: ["placeholder"],
-  },
-];
-
-const placeholderProjects = [
-  {
-    href: "#",
-    title: "Placeholder project",
-    summary: "What it does, what it was built with, and what problem it solved.",
-  },
-  {
-    href: "#",
-    title: "Another placeholder project",
-    summary: "Dashboards, pipelines, tooling — one card each.",
-  },
-];
-
 export default function Home() {
+  const posts = getEntries("posts").slice(0, 5);
+  const projects = getEntries("projects").slice(0, 4);
+
   return (
-    <div className="mx-auto max-w-3xl px-6">
+    <Container>
       <section className="border-b border-border py-20 sm:py-28">
         <p className="font-mono text-sm text-accent">Hi, I&apos;m {site.name}</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+        <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
           {site.tagline}
         </h1>
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted text-pretty">
-          This is a placeholder introduction. A couple of sentences about who you
-          are, what you work on, and what someone can expect to find here.
+        <p className="mt-6 max-w-[var(--measure)] text-lg leading-relaxed text-muted text-pretty">
+          {site.intro}
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
@@ -81,25 +46,15 @@ export default function Home() {
           </Link>
         </div>
 
-        <ul className="mt-8 flex flex-col divide-y divide-border">
-          {placeholderPosts.map((post) => (
-            <li key={post.title} className="py-5 first:pt-0 last:pb-0">
-              <Link href={post.slug} className="group block">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h3 className="font-medium tracking-tight transition-colors group-hover:text-accent">
-                    {post.title}
-                  </h3>
-                  <span className="font-mono text-xs text-muted">
-                    {post.date}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted text-pretty">
-                  {post.summary}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-8">
+          {posts.length > 0 ? (
+            <EntryList entries={posts} />
+          ) : (
+            <EmptyState>
+              No posts yet. Add an .mdx file to content/posts/ to publish one.
+            </EmptyState>
+          )}
+        </div>
       </section>
 
       <section className="py-16">
@@ -113,21 +68,16 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          {placeholderProjects.map((project) => (
-            <Link
-              key={project.title}
-              href={project.href}
-              className="rounded-xl border border-border bg-surface p-5 transition-colors hover:border-accent"
-            >
-              <h3 className="font-medium tracking-tight">{project.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted text-pretty">
-                {project.summary}
-              </p>
-            </Link>
-          ))}
+        <div className="mt-8">
+          {projects.length > 0 ? (
+            <EntryCards entries={projects} />
+          ) : (
+            <EmptyState>
+              No projects yet. Add an .mdx file to content/projects/ to publish one.
+            </EmptyState>
+          )}
         </div>
       </section>
-    </div>
+    </Container>
   );
 }

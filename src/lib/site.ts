@@ -6,6 +6,9 @@ export const site = {
     "Data analysis & data engineering — notes, tutorials, and things I build.",
   description:
     "Notes, tutorials and projects on data analysis and data engineering by Rodrigo Vaz.",
+  /** Longer blurb under the headline on the home page. */
+  intro:
+    "This is a placeholder introduction. A couple of sentences about who you are, what you work on, and what someone can expect to find here.",
   nav: [
     { href: "/", label: "Home" },
     { href: "/writing", label: "Writing" },

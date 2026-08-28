@@ -1,3 +1,4 @@
+import { Container } from "@/components/container";
 import { EmailLink } from "@/components/email-link";
 import { site } from "@/lib/site";
 
@@ -6,12 +7,12 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-24 border-t border-border">
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-10 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+      <Container className="flex flex-col gap-4 py-10 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
         <p>
           © {new Date().getFullYear()} {site.name}
         </p>
 
-        <ul className="flex flex-wrap gap-5">
+        <ul className="flex flex-wrap items-center gap-5">
           {site.social.map((link) => (
             <li key={link.href}>
               <a
@@ -27,8 +28,13 @@ export function SiteFooter() {
           <li>
             <EmailLink className={linkStyles} />
           </li>
+          <li>
+            <a href="/feed.xml" className={linkStyles}>
+              RSS
+            </a>
+          </li>
         </ul>
-      </div>
+      </Container>
     </footer>
   );
 }

@@ -1,0 +1,120 @@
+---
+title: Example post — everything the site can do
+date: 2026-08-28
+summary: A working demo of every feature available when writing a post. Delete this file once you have posts of your own.
+tags: [example, tutorial]
+draft: false
+cover: /images/posts/example-post/cover.png
+---
+
+This file exists to prove the pipeline works and to serve as a copy-paste
+reference. **Delete it** — along with `content/projects/example-project.mdx` and
+`public/images/posts/example-post/` — once you have real content.
+
+The authoring reference is `HowToEdit.mdx` at the repo root.
+
+## Text
+
+Regular prose with **bold**, *italic*, `inline code`, ~~strikethrough~~ and a
+[link to another page](/projects) on this site, plus one
+[to somewhere else](https://learn.microsoft.com/power-bi/) that opens in a new
+tab.
+
+> A blockquote, useful for pulling out a quotation or a caveat.
+
+- A bullet
+- Another bullet
+  - Nested one level
+
+1. A numbered step
+2. The one after it
+
+## Callouts
+
+<Callout>
+Ordinary aside. Good for a tip that would interrupt the flow as a paragraph.
+</Callout>
+
+<Callout type="warning" title="Publish to web is public">
+Power BI's *Publish to web* makes a report readable by anyone with the link,
+with no sign-in. Only ever point it at sample data.
+</Callout>
+
+## Images
+
+A plain markdown image. It is optimised, lazy-loaded, and spans the full width:
+
+![A placeholder standing in for a screenshot](/images/posts/example-post/screenshot.png)
+
+The same thing with a caption:
+
+<Figure
+  src="/images/posts/example-post/screenshot.png"
+  alt="A placeholder standing in for a screenshot"
+  caption="Figure 1 — captions are optional, alt text is not."
+/>
+
+## Embeds
+
+A YouTube video:
+
+<YouTube id="dQw4w9WgXcQ" title="Example video" />
+
+A Power BI report would go in like this — uncomment once you have a public
+report URL:
+
+```mdx
+<PowerBIEmbed src="https://app.powerbi.com/view?r=YOUR_REPORT_ID" />
+```
+
+And anything else that offers an iframe:
+
+```mdx
+<Embed src="https://example.com/embed" title="What the embed shows" />
+```
+
+## Code
+
+```sql
+select
+    customer_id,
+    sum(amount) as total_spend
+from orders
+where order_date >= '2026-01-01'
+group by customer_id
+order by total_spend desc;
+```
+
+```python
+import pandas as pd
+
+orders = pd.read_csv("orders.csv", parse_dates=["order_date"])
+top = (
+    orders.loc[orders["order_date"] >= "2026-01-01"]
+    .groupby("customer_id")["amount"]
+    .sum()
+    .sort_values(ascending=False)
+)
+```
+
+## Tables
+
+| Function  | Use it for                   | Still worth learning |
+| --------- | ---------------------------- | -------------------- |
+| `VLOOKUP` | Legacy files, leftmost key   | Only to read others' work |
+| `INDEX/MATCH` | Lookups in any direction | Sometimes            |
+| `XLOOKUP` | Everything new               | Yes                  |
+
+## Downloads
+
+Small files can sit in the repo:
+
+[Download the sample workbook](/downloads/example.csv)
+
+Anything large belongs on OneDrive or Drive, linked as a normal external link.
+
+## The MDX gotcha worth remembering
+
+Braces and angle brackets are special in prose. Wrap them in backticks:
+`{=SUM(A1:A10)}` and `revenue < budget` are both fine this way, and would break
+the build without it.

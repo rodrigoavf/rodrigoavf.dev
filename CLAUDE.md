@@ -19,7 +19,7 @@ material.
 | Framework  | Next.js 16 (App Router, React 19)      |
 | Language   | TypeScript                             |
 | Styling    | Tailwind CSS v4 (CSS-first, no config) |
-| Content    | MDX files in the repo (planned)        |
+| Content    | MDX files in the repo                  |
 | Hosting    | Vercel Hobby, custom domain            |
 | Rendering  | Static (SSG) — no database, no backend |
 
@@ -42,17 +42,32 @@ TypeScript checking too.
 ```
 src/
   app/
-    layout.tsx          root layout: header, footer, fonts, metadata
-    page.tsx            home page
-    globals.css         Tailwind import + design tokens
-    writing/page.tsx    post index          (placeholder)
-    projects/page.tsx   project index       (placeholder)
-    about/page.tsx      about               (placeholder)
-    not-found.tsx       404
-  components/           shared UI
-  lib/site.ts           single source of truth for name, nav, links, metadata
-public/                 static assets served at /
-HowToEdit.mdx           authoring cheat sheet (personal reference, not a page)
+    layout.tsx            root layout: header, footer, fonts, metadata
+    page.tsx              home page
+    globals.css           design tokens, themes, prose styles
+    writing/page.tsx      post index
+    writing/[slug]/       a post
+    projects/page.tsx     project index
+    projects/[slug]/      a project
+    tags/[tag]/           everything sharing a tag
+    feed.xml/route.ts     RSS
+    sitemap.ts robots.ts  SEO
+    not-found.tsx         404
+  components/
+    mdx/                  components usable inside posts + the renderer
+    entry-list.tsx        post rows, project cards, tag pills
+    entry-page.tsx        the shared article layout
+    theme-toggle.tsx      light/dark switch
+    theme-script.tsx      pre-paint theme, avoids a flash
+  lib/
+    site.ts               name, nav, links, metadata
+    content.ts            reads and validates content/, the content API
+    image-size.ts         intrinsic image dimensions, read at build time
+content/
+  posts/*.mdx             a post per file; filename = URL slug
+  projects/*.mdx          same, for projects
+public/                   static assets served at /
+HowToEdit.mdx             authoring cheat sheet (personal reference, not a page)
 ```
 
 `HowToEdit.mdx` at the repo root is the owner's own reference for writing posts
@@ -62,7 +77,7 @@ the content model changes.
 
 ## Content model
 
-**Decision: content lives in the repo as MDX** (`.mdx`), not plain `.md`.
+**Content lives in the repo as MDX** (`.mdx`), not plain `.md`.
 
 MDX is markdown that can also render React components. Ordinary posts are written
 as plain markdown and read exactly like markdown; the moment a post needs
@@ -70,7 +85,7 @@ something markdown can't express — a Power BI embed, a callout, a chart — a
 component can be dropped inline. This is what resolves the "will markdown handle
 images and embeds?" concern: it does, without locking anything down.
 
-Planned shape:
+Shape:
 
 ```
 content/
@@ -119,10 +134,18 @@ workflow — Vercel rebuilds on push.
 - Path alias `@/*` → `src/*`.
 - Colors come from the CSS variables in `globals.css` (`background`, `surface`,
   `foreground`, `muted`, `border`, `accent`) and are used as Tailwind utilities
-  (`text-muted`, `border-border`). Light and dark are both defined there —
-  **never hardcode a hex value in a component**, and never add a color to only
-  one of the two themes.
-- Layout width is `max-w-3xl` with `px-6`. Keep pages consistent with that.
+  (`text-muted`, `border-border`). **Never hardcode a hex value in a component.**
+- There are three theme states: an explicit choice sets `data-theme` on `<html>`;
+  with no choice the OS preference applies. Every token must therefore be defined
+  in all three blocks in `globals.css` — bare `:root`, the
+  `prefers-color-scheme: dark` block, and `:root[data-theme="dark"]`. Adding a
+  colour to only one of them is the easy mistake here.
+- Width comes from two CSS variables in `globals.css`: `--container` (the page,
+  64rem) and `--measure` (the readable text column, 42rem). Use the `<Container>`
+  component rather than setting a max width per page.
+- Inside an article, `.prose` is a grid: text sits in the `--measure` column, and
+  any direct child with the `wide` class (figures, embeds, code blocks, tables)
+  spans the full container. Add `wide` to new block-level MDX components.
 - Server Components by default; add `"use client"` only where interactivity
   genuinely requires it.
 - Site name, nav, and social links live in `src/lib/site.ts` — edit them there,
@@ -137,18 +160,54 @@ workflow — Vercel rebuilds on push.
 
 ## Current state
 
-Scaffolding and design system are in place. The home page and the
-writing/projects/about pages render **placeholder content only**.
+The mechanics are complete and tested. What is missing is **content** — the
+site ships with example files that exist to demonstrate the pipeline.
 
-Not built yet:
+Working:
 
-- The MDX pipeline (`content/` directory, frontmatter parsing, `[slug]` routes,
-  post index, syntax highlighting, embed components).
-- `sitemap.ts`, `robots.ts`, RSS feed, OG images.
-- Real copy, real posts, real projects.
+- MDX pipeline: frontmatter parsing and validation, `[slug]` routes for posts and
+  projects, indexes, tag pages, drafts, reading time.
+- Authoring components: `<Figure>`, `<Callout>`, `<PowerBIEmbed>`, `<YouTube>`,
+  `<Embed>`; markdown images routed through `next/image` with dimensions measured
+  from the file at build time.
+- Syntax highlighting via Shiki, emitting both themes as CSS variables so a theme
+  switch needs no re-highlight.
+- Light/dark themes with a toggle, an OS-preference default, and no flash on load.
+- `sitemap.xml`, `robots.txt`, RSS at `/feed.xml`, per-page OpenGraph metadata.
+
+Not built:
+
+- Dynamic OG images (`opengraph-image.tsx`) — posts currently fall back to the
+  `cover` image where one is set.
+- Search, pagination, and comments. None are worth adding until there is enough
+  content to need them.
+
+**Delete when real content arrives:** `content/posts/example-post.mdx`,
+`content/posts/draft-example.mdx`, `content/projects/example-project.mdx`,
+`public/images/posts/example-post/`, `public/downloads/example.csv`.
+
+## Content rules enforced at build time
+
+`src/lib/content.ts` throws — failing `npm run build` — when a file has a
+filename that is not lowercase-with-hyphens, a missing `title`/`date`/`summary`,
+a `date` that is not `YYYY-MM-DD`, or `tags` that are not a list. This is
+deliberate: a broken post should stop the deploy, not ship half-rendered.
+
+Drafts (`draft: true`) are visible in `npm run dev` and excluded from
+`npm run build`, so an unfinished post can be pushed safely.
 
 ## Deployment
 
 Vercel, connected to this GitHub repo. Push to the default branch deploys to
 production; other branches get preview URLs. No environment variables are
 required. Next.js is auto-detected, so no `vercel.json` is needed.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

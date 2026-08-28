@@ -9,10 +9,6 @@ private: true
 My personal reference. Not published — this file sits at the repo root and is
 never rendered as a page.
 
-> **Note:** the MDX pipeline described here is the agreed design but is **not
-> built yet** (see the "Current state" section of `CLAUDE.md`). Everything below
-> is the shape to write against once it lands.
-
 ---
 
 ## The whole workflow
@@ -88,8 +84,13 @@ title: "Power BI: incremental refresh explained"
 ```
 
 Set `draft: true` to work on something over several pushes without publishing
-it. It still builds and is visible with `npm run dev`, just excluded from the
-live index.
+it. It still builds and is visible with `npm run dev` (with a "Draft" banner on
+the page), just excluded from the live site.
+
+`title`, `date` and `summary` are checked when the site builds. Get one wrong and
+`npm run build` stops with a message naming the file and the problem, rather than
+deploying something broken. The filename is checked too — it must be
+lowercase-with-hyphens.
 
 ---
 
@@ -123,6 +124,22 @@ outline.
 A blank line between blocks is what separates them. Two paragraphs with no blank
 line between them become one paragraph.
 
+### Callouts
+
+For something that should stand out more than a blockquote:
+
+```mdx
+<Callout>
+A tip that would interrupt the flow as a plain paragraph.
+</Callout>
+
+<Callout type="warning" title="Optional custom heading">
+Something the reader could get wrong.
+</Callout>
+```
+
+`type` is `note` (the default) or `warning`.
+
 ### Tables
 
 ```mdx
@@ -151,7 +168,12 @@ Internal links start with `/` — **never** write the full `https://rodrigoavf.d
 URL for your own pages, or local previews will jump to the live site.
 
 Anchor links use the heading text, lowercased with spaces turned into hyphens:
-`## Writing the body` becomes `#writing-the-body`.
+`## Writing the body` becomes `#writing-the-body`. Every heading gets one
+automatically — hover a heading on the live page to see it.
+
+Tags each get their own page at `/tags/<tag>`, listing every post and project
+carrying it. Nothing to set up: add a tag to the frontmatter and the page
+appears.
 
 ---
 
@@ -190,8 +212,12 @@ With a caption:
   repo full of 4 MB PNGs gets unpleasant to clone.
 - **Screenshots → PNG. Photos → JPG.** Diagrams and logos → SVG if you have it.
 - **Resize before committing.** Nothing needs to be wider than ~1600 px.
-- Images are lazy-loaded and served in modern formats automatically. That's
-  handled — just don't commit anything enormous.
+- Images are lazy-loaded, resized and served in modern formats automatically,
+  and their dimensions are read from the file at build time so the page doesn't
+  jump as they load. That's all handled — just don't commit anything enormous.
+- Images, embeds, code blocks and tables span the **full page width**, wider
+  than the text column. That's deliberate: prose stays at a readable line
+  length while screenshots get room to breathe.
 
 ---
 
@@ -346,5 +372,5 @@ safe there. It's only loose prose you need to watch.
 - [ ] Every image has real alt text, and the files are in `public/images/posts/<slug>/`
 - [ ] Links tested — internal ones start with `/`, external ones actually open
 - [ ] Any download link tested in a private window
-- [ ] `npm run build` passes
+- [ ] `npm run build` passes (it also enforces the frontmatter rules above)
 - [ ] `draft: true` removed if you meant to publish
