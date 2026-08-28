@@ -154,13 +154,14 @@ export function SearchDialog() {
                         onClick={close}
                         onMouseEnter={() => setActive(index)}
                         data-active={index === active}
+                        data-tone={result.collection}
                         className="block rounded-lg px-3 py-2.5 data-[active=true]:bg-background"
                       >
                         <div className="flex items-baseline justify-between gap-3">
                           <span className="font-medium tracking-tight">
                             {result.title}
                           </span>
-                          <span className="shrink-0 font-mono text-xs text-muted">
+                          <span className="shrink-0 font-mono text-xs text-tone">
                             {result.collectionLabel}
                           </span>
                         </div>

@@ -4,14 +4,17 @@ import { Container } from "@/components/container";
 export function PageShell({
   title,
   intro,
+  tone,
   children,
 }: {
   title: string;
   intro?: string;
+  /** Collection name, so tags and accents on this page use its hue. */
+  tone?: string;
   children?: ReactNode;
 }) {
   return (
-    <Container className="py-16 sm:py-20">
+    <Container className="py-16 sm:py-20" data-tone={tone}>
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {title}
       </h1>

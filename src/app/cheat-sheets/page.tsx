@@ -12,6 +12,7 @@ export default function CheatSheetsPage() {
 
   return (
     <PageShell
+      tone="cheatsheets"
       title="Cheat Sheets"
       intro="Quick references I keep coming back to — syntax, shortcuts and the things that never stick."
     >

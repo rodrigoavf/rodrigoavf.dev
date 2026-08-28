@@ -149,8 +149,21 @@ workflow — Vercel rebuilds on push.
 
 - Path alias `@/*` → `src/*`.
 - Colors come from the CSS variables in `globals.css` (`background`, `surface`,
-  `foreground`, `muted`, `border`, `accent`) and are used as Tailwind utilities
-  (`text-muted`, `border-border`). **Never hardcode a hex value in a component.**
+  `foreground`, `muted`, `border`, `accent`, `on-accent`, `warning`) and are used
+  as Tailwind utilities (`text-muted`, `border-border`). **Never hardcode a hex
+  value in a component.**
+- **Each collection has its own hue** — `--tone-posts` (blue), `--tone-projects`
+  (amber), `--tone-cheatsheets` (teal). Put `data-tone={collection}` on a
+  wrapper and every `tone` utility inside it (`text-tone`, `bg-tone`,
+  `border-tone`) resolves to that collection's colour. This is what stops the
+  site reading as monochrome, and it carries meaning: colour tells you what kind
+  of thing you are looking at, in cards, tags and search results alike.
+- `--on-accent` is the text colour to use on an `--accent` fill. It flips
+  between themes, because the accent is dark on light and light on dark — a
+  hardcoded white button label would vanish in dark mode.
+- Every colour pair is checked against WCAG AA (4.5:1) in both themes. When
+  changing a token, re-check it — `color-mix` results are not obvious by eye,
+  and the tones sit on both `background` and `surface`.
 - There are three theme states: an explicit choice sets `data-theme` on `<html>`;
   with no choice the OS preference applies. Every token must therefore be defined
   in all three blocks in `globals.css` — bare `:root`, the

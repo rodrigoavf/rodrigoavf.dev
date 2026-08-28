@@ -9,13 +9,30 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  --background: #fbfbfa;
+  /* Neutrals carry a slight warmth so the page reads as paper rather than
+     switched-off grey. */
+  --background: #faf9f7;
   --surface: #ffffff;
   --foreground: #16181d;
-  --muted: #5b6472;
-  --border: #e4e4e1;
-  --accent: #1a5fd0;
-  --warning: #b25000;
+  --muted: #575f70;
+  --border: #e6e3dd;
+
+  --accent: #3a52b8;
+  /* Readable text on an --accent fill. Flips with the theme, because the
+     accent is dark on light and light on dark. */
+  --on-accent: #ffffff;
+  --warning: #a1500a;
+
+  /* One hue per collection. Used for tags, card hovers and the labels in
+     search results, so colour signals *what kind of thing* something is
+     rather than just decorating. Every value is AA on both background and
+     surface — check before changing one. */
+  --tone-posts: #3a52b8;
+  --tone-projects: #a2560c;
+  --tone-cheatsheets: #0d7268;
+
+  /* The active tone, overridden per element by [data-tone]. */
+  --tone: var(--accent);
 
   /* Layout: the page is this wide; body text is held to a readable measure
      inside it, while figures, code and tables use the full width. */
@@ -25,24 +42,50 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #0c0d10;
-    --surface: #131519;
-    --foreground: #ecedee;
-    --muted: #949cab;
-    --border: #24272d;
-    --accent: #79aaff;
+    --background: #0d1017;
+    --surface: #141824;
+    --foreground: #e9ecf2;
+    --muted: #98a1b3;
+    --border: #262b38;
+
+    --accent: #93a9ff;
+    --on-accent: #0d1017;
     --warning: #f0a253;
+
+    --tone-posts: #93a9ff;
+    --tone-projects: #f0b45f;
+    --tone-cheatsheets: #4fd6c0;
   }
 }
 
 :root[data-theme="dark"] {
-  --background: #0c0d10;
-  --surface: #131519;
-  --foreground: #ecedee;
-  --muted: #949cab;
-  --border: #24272d;
-  --accent: #79aaff;
+  --background: #0d1017;
+  --surface: #141824;
+  --foreground: #e9ecf2;
+  --muted: #98a1b3;
+  --border: #262b38;
+
+  --accent: #93a9ff;
+  --on-accent: #0d1017;
   --warning: #f0a253;
+
+  --tone-posts: #93a9ff;
+  --tone-projects: #f0b45f;
+  --tone-cheatsheets: #4fd6c0;
+}
+
+/* Collection tones. Set data-tone={collection} on a wrapper and every
+   `tone` utility inside it picks up that collection's hue. */
+[data-tone="posts"] {
+  --tone: var(--tone-posts);
+}
+
+[data-tone="projects"] {
+  --tone: var(--tone-projects);
+}
+
+[data-tone="cheatsheets"] {
+  --tone: var(--tone-cheatsheets);
 }
 
 @theme inline {
@@ -53,6 +96,8 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-warning: var(--warning);
+  --color-tone: var(--tone);
+  --color-on-accent: var(--on-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -180,7 +225,7 @@ body {
 }
 
 .prose blockquote {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid color-mix(in oklab, var(--tone) 45%, transparent);
   padding-left: 1.25em;
   color: var(--muted);
   font-style: italic;
@@ -224,7 +269,8 @@ body {
 .prose :not(pre) > code {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.875em;
-  background: color-mix(in oklab, var(--muted) 14%, transparent);
+  background: color-mix(in oklab, var(--tone) 10%, transparent);
+  color: color-mix(in oklab, var(--tone) 75%, var(--foreground));
   border-radius: 4px;
   padding: 0.15em 0.35em;
   word-break: break-word;
@@ -332,4 +378,27 @@ body {
 
 :root[data-theme="dark"] .theme-icon-moon {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero wash.
+
+   Two very low-opacity radial tints on a full-width element, so the top of the
+   home page carries a hint of colour. Painted as a plain background rather than
+   an absolutely-positioned pseudo-element: the earlier version used negative
+   viewport insets, which pushed the page into horizontal overflow.
+--------------------------------------------------------------------------- */
+
+.hero-glow {
+  background:
+    radial-gradient(
+      48rem 26rem at 20% -20%,
+      color-mix(in oklab, var(--tone-posts) 16%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      40rem 22rem at 78% -10%,
+      color-mix(in oklab, var(--tone-cheatsheets) 13%, transparent),
+      transparent 72%
+    );
 }

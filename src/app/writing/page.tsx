@@ -13,6 +13,7 @@ export default function WritingPage() {
 
   return (
     <PageShell
+      tone="posts"
       title="Writing"
       intro="Notes, tutorials and ideas about data analysis and data engineering."
     >

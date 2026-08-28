@@ -7,10 +7,10 @@ import { formatDate, type Entry } from "@/lib/content";
 /** The shared article layout for a single post or project. */
 export function EntryPage({ entry, backTo }: { entry: Entry; backTo: { href: string; label: string } }) {
   return (
-    <Container className="py-12 sm:py-16">
+    <Container className="py-12 sm:py-16" data-tone={entry.collection}>
       <Link
         href={backTo.href}
-        className="font-mono text-sm text-muted transition-colors hover:text-foreground"
+        className="font-mono text-sm text-muted transition-colors hover:text-tone"
       >
         ← {backTo.label}
       </Link>
@@ -42,7 +42,7 @@ export function EntryPage({ entry, backTo }: { entry: Entry; backTo: { href: str
                   <li key={tag}>
                     <Link
                       href={`/tags/${tag}`}
-                      className="transition-colors hover:text-accent"
+                      className="rounded-md border border-tone/25 bg-tone/8 px-1.5 py-0.5 text-tone transition-colors hover:border-tone/60"
                     >
                       #{tag}
                     </Link>

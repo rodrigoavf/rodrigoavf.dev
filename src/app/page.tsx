@@ -8,45 +8,51 @@ import { site } from "@/lib/site";
 export default function Home() {
   const posts = getEntries("posts").slice(0, 5);
   const projects = getEntries("projects").slice(0, 4);
+  const sheets = getEntries("cheatsheets").slice(0, 4);
 
   return (
-    <Container>
-      <section className="border-b border-border py-20 sm:py-28">
-        <p className="font-mono text-sm text-accent">Hi, I&apos;m {site.name}</p>
-        <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          {site.tagline}
-        </h1>
-        <p className="mt-6 max-w-[var(--measure)] text-lg leading-relaxed text-muted text-pretty">
-          {site.intro}
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/writing"
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-85"
-          >
-            Read the writing
-          </Link>
-          <Link
-            href="/about"
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
-          >
-            About me
-          </Link>
-        </div>
-      </section>
+    <>
+      {/* Full-width so the colour wash can span the viewport. Doing this with
+          negative insets on a pseudo-element instead caused horizontal
+          overflow, and a negative z-index hid it behind the body background. */}
+      <div className="hero-glow border-b border-border">
+        <Container>
+          <section className="py-20 sm:py-28">
+            <p className="font-mono text-sm text-accent">
+              Hi, I&apos;m {site.name}
+            </p>
+            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              {site.tagline}
+            </h1>
+            <p className="mt-6 max-w-[var(--measure)] text-lg leading-relaxed text-muted text-pretty">
+              {site.intro}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/writing"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+              >
+                Read the writing
+              </Link>
+              <Link
+                href="/about"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+              >
+                About me
+              </Link>
+            </div>
+          </section>
+        </Container>
+      </div>
 
-      <section className="border-b border-border py-16">
-        <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-xl font-semibold tracking-tight">Latest writing</h2>
-          <Link
-            href="/writing"
-            className="text-sm text-muted transition-colors hover:text-foreground"
-          >
-            All posts →
-          </Link>
-        </div>
-
-        <div className="mt-8">
+      <Container>
+        <HomeSection
+          tone="posts"
+          title="Latest writing"
+          href="/writing"
+          linkLabel="All posts"
+          bordered
+        >
           {posts.length > 0 ? (
             <EntryList entries={posts} />
           ) : (
@@ -54,30 +60,79 @@ export default function Home() {
               No posts yet. Add an .mdx file to content/posts/ to publish one.
             </EmptyState>
           )}
-        </div>
-      </section>
+        </HomeSection>
 
-      <section className="py-16">
-        <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-xl font-semibold tracking-tight">Projects</h2>
-          <Link
-            href="/projects"
-            className="text-sm text-muted transition-colors hover:text-foreground"
-          >
-            All projects →
-          </Link>
-        </div>
-
-        <div className="mt-8">
+        <HomeSection
+          tone="projects"
+          title="Projects"
+          href="/projects"
+          linkLabel="All projects"
+          bordered
+        >
           {projects.length > 0 ? (
             <EntryCards entries={projects} />
           ) : (
             <EmptyState>
-              No projects yet. Add an .mdx file to content/projects/ to publish one.
+              No projects yet. Add an .mdx file to content/projects/ to publish
+              one.
             </EmptyState>
           )}
-        </div>
-      </section>
-    </Container>
+        </HomeSection>
+
+        <HomeSection
+          tone="cheatsheets"
+          title="Cheat Sheets"
+          href="/cheat-sheets"
+          linkLabel="All cheat sheets"
+        >
+          {sheets.length > 0 ? (
+            <EntryCards entries={sheets} />
+          ) : (
+            <EmptyState>
+              No cheat sheets yet. Add an .mdx file to content/cheatsheets/ to
+              publish one.
+            </EmptyState>
+          )}
+        </HomeSection>
+      </Container>
+    </>
+  );
+}
+
+function HomeSection({
+  tone,
+  title,
+  href,
+  linkLabel,
+  bordered = false,
+  children,
+}: {
+  tone: string;
+  title: string;
+  href: string;
+  linkLabel: string;
+  bordered?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      data-tone={tone}
+      className={`py-16 ${bordered ? "border-b border-border" : ""}`}
+    >
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="flex items-center gap-2.5 text-xl font-semibold tracking-tight">
+          <span aria-hidden="true" className="h-4 w-1 rounded-full bg-tone" />
+          {title}
+        </h2>
+        <Link
+          href={href}
+          className="text-sm text-muted transition-colors hover:text-tone"
+        >
+          {linkLabel} →
+        </Link>
+      </div>
+
+      <div className="mt-8">{children}</div>
+    </section>
   );
 }

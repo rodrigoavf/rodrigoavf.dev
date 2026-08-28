@@ -12,6 +12,7 @@ export default function ProjectsPage() {
 
   return (
     <PageShell
+      tone="projects"
       title="Projects"
       intro="Dashboards, pipelines and tools I have built."
     >
