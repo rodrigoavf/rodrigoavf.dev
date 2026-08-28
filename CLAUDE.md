@@ -52,7 +52,13 @@ src/
   components/           shared UI
   lib/site.ts           single source of truth for name, nav, links, metadata
 public/                 static assets served at /
+HowToEdit.mdx           authoring cheat sheet (personal reference, not a page)
 ```
+
+`HowToEdit.mdx` at the repo root is the owner's own reference for writing posts
+— frontmatter fields, image paths, embed syntax, MDX pitfalls. It is deliberately
+outside `content/`, so it is never rendered or published. Keep it in sync when
+the content model changes.
 
 ## Content model
 

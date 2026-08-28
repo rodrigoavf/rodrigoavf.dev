@@ -1,0 +1,350 @@
+---
+title: How to edit this site
+summary: My own cheat sheet — adding posts, images, embeds and downloads.
+private: true
+---
+
+# How to edit this site
+
+My personal reference. Not published — this file sits at the repo root and is
+never rendered as a page.
+
+> **Note:** the MDX pipeline described here is the agreed design but is **not
+> built yet** (see the "Current state" section of `CLAUDE.md`). Everything below
+> is the shape to write against once it lands.
+
+---
+
+## The whole workflow
+
+1. Create or edit a `.mdx` file under `content/`.
+2. Commit and push to the default branch.
+3. Vercel rebuilds automatically. Live in ~1 minute.
+
+That's it. No CMS, no admin panel, no database.
+
+To preview locally before pushing:
+
+```bash
+npm run dev     # http://localhost:3000
+```
+
+---
+
+## Where files go
+
+```
+content/
+  posts/
+    how-to-vlookup-in-excel.mdx      → /writing/how-to-vlookup-in-excel
+    star-schema-basics.mdx           → /writing/star-schema-basics
+  projects/
+    sales-dashboard.mdx              → /projects/sales-dashboard
+
+public/
+  images/
+    posts/
+      how-to-vlookup-in-excel/       → one folder per post
+        step-1.png
+  downloads/
+    vlookup-sample.xlsx              → only small files (see Downloads below)
+```
+
+**The filename is the URL.** `how-to-vlookup-in-excel.mdx` becomes
+`/writing/how-to-vlookup-in-excel`. Use lowercase words separated by hyphens, no
+spaces, no accents. Renaming a file changes its URL and breaks any existing
+links to it, so pick the name once and leave it alone.
+
+---
+
+## Frontmatter
+
+Every file opens with a block between two `---` lines. This is data about the
+post, not content — it never appears in the body.
+
+```mdx
+---
+title: How to VLOOKUP in Excel
+date: 2026-08-28
+summary: A one- or two-line description, used on the index page and in link previews.
+tags: [excel, tutorial]
+draft: false
+---
+```
+
+| Field     | Required | Notes                                                     |
+| --------- | -------- | --------------------------------------------------------- |
+| `title`   | yes      | Shown as the page heading and browser tab title.           |
+| `date`    | yes      | `YYYY-MM-DD`. Sorts the index, newest first.               |
+| `summary` | yes      | Index cards and social previews. Keep it under ~160 chars. |
+| `tags`    | no       | Lowercase, in square brackets. Used for filtering.         |
+| `draft`   | no       | `true` hides it from the live site. Defaults to `false`.   |
+| `cover`   | no       | Path to a header image, e.g. `/images/posts/<slug>/cover.png`. |
+
+If a value contains a colon, wrap it in quotes:
+
+```mdx
+title: "Power BI: incremental refresh explained"
+```
+
+Set `draft: true` to work on something over several pushes without publishing
+it. It still builds and is visible with `npm run dev`, just excluded from the
+live index.
+
+---
+
+## Writing the body
+
+Ordinary markdown, below the frontmatter.
+
+```mdx
+## A section heading
+
+Regular text. **Bold**, *italic*, `inline code`, and ~~strikethrough~~.
+
+- A bullet
+- Another bullet
+  - Nested one level
+
+1. A numbered step
+2. The next step
+
+> A blockquote, good for callouts and warnings.
+
+A horizontal rule:
+
+---
+```
+
+**Start headings at `##`, not `#`.** The `title` from the frontmatter is already
+rendered as the page's `#` heading, so a second one throws off the document
+outline.
+
+A blank line between blocks is what separates them. Two paragraphs with no blank
+line between them become one paragraph.
+
+### Tables
+
+```mdx
+| Function  | Use it for                    |
+| --------- | ----------------------------- |
+| `VLOOKUP` | Legacy lookups, leftmost key  |
+| `XLOOKUP` | Everything new                |
+```
+
+The dashes row is required. Column widths in the source don't matter — they're
+only for readability while editing.
+
+---
+
+## Links
+
+```mdx
+[External link](https://learn.microsoft.com/power-bi/)
+
+[Another post on this site](/writing/star-schema-basics)
+
+[A section on this page](#writing-the-body)
+```
+
+Internal links start with `/` — **never** write the full `https://rodrigoavf.dev/...`
+URL for your own pages, or local previews will jump to the live site.
+
+Anchor links use the heading text, lowercased with spaces turned into hyphens:
+`## Writing the body` becomes `#writing-the-body`.
+
+---
+
+## Images
+
+**Where they go:** `public/images/posts/<slug>/`, one folder per post.
+
+**How to reference them:** the path in markdown drops the `public` part, because
+everything in `public/` is served from the site root.
+
+| File on disk                                    | Path in the post                     |
+| ----------------------------------------------- | ------------------------------------ |
+| `public/images/posts/vlookup/step-1.png`        | `/images/posts/vlookup/step-1.png`   |
+
+```mdx
+![Selecting the lookup range](/images/posts/vlookup/step-1.png)
+```
+
+The text in the square brackets is the alt text — a plain description of what
+the image shows, for screen readers and for when the image fails to load. Write
+a real description, not "screenshot".
+
+With a caption:
+
+```mdx
+<Figure
+  src="/images/posts/vlookup/step-1.png"
+  alt="Selecting the lookup range"
+  caption="The range must start at the column holding the key."
+/>
+```
+
+### Practical notes
+
+- **Keep files small.** Under ~500 KB each. These live in git forever, and a
+  repo full of 4 MB PNGs gets unpleasant to clone.
+- **Screenshots → PNG. Photos → JPG.** Diagrams and logos → SVG if you have it.
+- **Resize before committing.** Nothing needs to be wider than ~1600 px.
+- Images are lazy-loaded and served in modern formats automatically. That's
+  handled — just don't commit anything enormous.
+
+---
+
+## Embeds
+
+### Power BI
+
+```mdx
+<PowerBIEmbed src="https://app.powerbi.com/view?r=eyJrIjoi..." />
+```
+
+To get that URL, the report must be **published publicly** — in Power BI
+Service, open the report, then **File → Embed report → Publish to web (public)**.
+Copy the URL from the embed code it gives you (the `src` of the iframe, the one
+starting `https://app.powerbi.com/view?r=`).
+
+Two things to know before you do this:
+
+- *Publish to web* makes the report **visible to anyone on the internet**, with
+  no login. Never use it for anything with real, confidential or personal data.
+  Build a sample dataset for the post instead.
+- It's a different feature from "Embed in SharePoint" or the secure embed
+  options, which need a login and won't work here.
+
+Optional aspect ratio, if the default doesn't suit the report:
+
+```mdx
+<PowerBIEmbed src="https://app.powerbi.com/view?r=..." ratio="4/3" />
+```
+
+### YouTube
+
+```mdx
+<YouTube id="dQw4w9WgXcQ" />
+```
+
+The id is the part after `v=` in the watch URL — from
+`https://www.youtube.com/watch?v=dQw4w9WgXcQ`, the id is `dQw4w9WgXcQ`.
+
+### Anything else
+
+For any other service that gives you an `<iframe>` embed code — an Observable
+notebook, a CodePen, a Google Sheet, a Tableau viz — take the `src` from its
+iframe and use:
+
+```mdx
+<Embed src="https://..." title="What the embed shows" />
+```
+
+Always pass a `title`; screen readers read it to announce the frame.
+
+Not every site allows embedding. If the frame renders blank, that site is
+blocking it (via `X-Frame-Options`) and there's no way around it — link to it
+instead.
+
+---
+
+## Downloads
+
+**Small files** — a sample `.xlsx`, a `.csv`, a `.pbix` of a few MB — go in
+`public/downloads/` and are linked directly:
+
+```mdx
+[Download the sample workbook](/downloads/vlookup-sample.xlsx)
+```
+
+**Anything larger** goes to OneDrive or Google Drive, linked as a normal
+external link:
+
+```mdx
+[Download the dataset (240 MB)](https://onedrive.live.com/...)
+```
+
+Set the sharing to **anyone with the link can view** or the link will only work
+while you're logged in. Test it in a private browsing window.
+
+Mention the size and format in the link text when the file is big — it's a
+courtesy, and it stops people wondering what they just clicked.
+
+Rule of thumb: if it's over ~5 MB, or it's a binary you'll re-upload often, host
+it externally. Git keeps every version of every file forever, and large binaries
+bloat the repo permanently.
+
+---
+
+## Code blocks
+
+Fence code with three backticks and name the language for syntax highlighting:
+
+````mdx
+```sql
+select customer_id, sum(amount) as total
+from orders
+group by customer_id;
+```
+
+```python
+df = pd.read_csv("orders.csv")
+df.groupby("customer_id")["amount"].sum()
+```
+````
+
+Useful language names: `sql`, `python`, `dax`, `powerquery`, `excel`, `bash`,
+`json`, `yaml`, `text`. Use `text` for anything with no highlighting, like
+console output.
+
+---
+
+## MDX gotchas
+
+MDX is markdown plus components, and that "plus" means two characters are
+special. This bites hardest when writing about formulas.
+
+**`{` and `}` open a code expression.** So this breaks the build:
+
+```mdx
+Array formulas are wrapped in braces: {=SUM(A1:A10)}
+```
+
+Write it inside backticks instead, which is what you want typographically anyway:
+
+```mdx
+Array formulas are wrapped in braces: `{=SUM(A1:A10)}`
+```
+
+**`<` starts a component** when followed by a letter. So `if x <b then` breaks,
+while `if x < b then` (with a space) is fine. Again, backticks solve it:
+
+```mdx
+Rows where `revenue < budget` are flagged.
+```
+
+Inside fenced code blocks, none of this applies — braces and angle brackets are
+safe there. It's only loose prose you need to watch.
+
+**Other things worth knowing:**
+
+- Components are case-sensitive and must be capitalised: `<YouTube />`, not
+  `<youtube />`.
+- Components with no children must self-close — the `/` before the `>` in
+  `<PowerBIEmbed src="..." />` is required.
+- Leave a blank line before and after a component sitting on its own.
+- HTML comments don't work. Use `{/* this is an MDX comment */}` instead.
+
+---
+
+## Checklist before pushing
+
+- [ ] Frontmatter has `title`, `date` and `summary`
+- [ ] Filename is lowercase-with-hyphens and matches the URL you want
+- [ ] Headings start at `##`
+- [ ] Every image has real alt text, and the files are in `public/images/posts/<slug>/`
+- [ ] Links tested — internal ones start with `/`, external ones actually open
+- [ ] Any download link tested in a private window
+- [ ] `npm run build` passes
+- [ ] `draft: true` removed if you meant to publish
