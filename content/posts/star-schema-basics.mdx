@@ -1,0 +1,60 @@
+---
+title: Why your Power BI model is slow (and what a star schema fixes)
+date: 2026-08-14
+summary: Most slow reports are not a DAX problem. They are a modelling problem, and the fix is older than Power BI itself.
+tags: [power-bi, modelling, dax]
+---
+
+The first thing people try when a report is slow is rewriting the DAX. Usually
+that is the wrong end of the problem. If the model underneath is a single wide
+table — or worse, a web of tables joined every which way — no amount of measure
+tuning will save it.
+
+## The shape you want
+
+A star schema has one fact table in the middle and dimension tables around it,
+each joined once, one-to-many, filtering in a single direction.
+
+| Table         | Kind      | Grain                  |
+| ------------- | --------- | ---------------------- |
+| `Sales`       | Fact      | One row per order line |
+| `Date`        | Dimension | One row per day        |
+| `Customer`    | Dimension | One row per customer   |
+| `Product`     | Dimension | One row per product    |
+
+That is the whole idea. Facts hold the numbers you aggregate; dimensions hold
+the things you slice by.
+
+## Why it is faster
+
+The engine compresses columns, not rows. A narrow fact table of keys and
+measures compresses extremely well. A wide table repeating a customer's name and
+address on every order line does not.
+
+<Callout>
+If you only change one thing: move descriptive text columns out of the fact
+table and into dimensions. The compression difference is often dramatic.
+</Callout>
+
+## A measure that behaves
+
+Once the model is right, time intelligence stops fighting you:
+
+```dax
+Sales YTD =
+CALCULATE (
+    SUM ( Sales[Amount] ),
+    DATESYTD ( 'Date'[Date] )
+)
+```
+
+This only works if `Date` is a real date dimension marked as a date table, with
+one contiguous row per day. Half the "DATESYTD returns blank" questions come
+down to a date table with gaps in it.
+
+## What to do next
+
+1. Find the widest table in your model.
+2. Split the descriptive columns out into dimensions.
+3. Delete columns nobody uses. Most models carry a lot of them.
+4. Mark your date table as a date table.

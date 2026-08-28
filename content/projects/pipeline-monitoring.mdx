@@ -1,0 +1,56 @@
+---
+title: Pipeline monitoring without a monitoring product
+date: 2026-07-15
+summary: Freshness and row-count checks written as dbt tests, surfaced on a single page. No new vendor.
+tags: [dbt, data-engineering, sql]
+---
+
+## The problem
+
+Pipelines failed quietly. A source would stop delivering and nobody noticed
+until a number looked wrong in a meeting, days later.
+
+## The approach
+
+Rather than buying an observability tool, the checks went where the
+transformations already lived — as dbt tests, run on the same schedule.
+
+```yaml
+sources:
+  - name: shop
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
+    tables:
+      - name: orders
+        loaded_at_field: created_at
+```
+
+A failing freshness check fails the run, and the run already alerts.
+
+## Row-count drift
+
+Freshness catches a table that stopped. It does not catch one delivering a
+tenth of its usual volume. That needed a custom test comparing today against a
+trailing median:
+
+```sql
+with daily as (
+    select date_trunc('day', created_at) as day, count(*) as rows_loaded
+    from {{ source('shop', 'orders') }}
+    group by 1
+)
+select * from daily
+where day = current_date
+  and rows_loaded < 0.5 * (
+      select percentile_cont(0.5) within group (order by rows_loaded)
+      from daily where day between current_date - 30 and current_date - 1
+  )
+```
+
+Any row returned is a failure.
+
+## What I would change
+
+The thresholds are static. A seasonal business would need them to move with the
+expected shape of the week.

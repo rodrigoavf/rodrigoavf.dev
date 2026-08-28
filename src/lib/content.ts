@@ -2,7 +2,42 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 
-export type Collection = "posts" | "projects";
+/**
+ * Every content collection, in nav order.
+ *
+ * Adding one here is most of the work: tag pages, the sitemap and search all
+ * iterate over this. What is still needed is the pair of routes under
+ * `src/app/<basePath>/` — copy an existing pair, they are a few lines each.
+ */
+export const COLLECTIONS = {
+  posts: {
+    dir: "posts",
+    basePath: "/writing",
+    label: "Writing",
+    /** Cards read better for reference material; rows suit dated posts. */
+    layout: "list",
+    empty: "No posts yet. Add an .mdx file to content/posts/ to publish one.",
+  },
+  projects: {
+    dir: "projects",
+    basePath: "/projects",
+    label: "Projects",
+    layout: "cards",
+    empty: "No projects yet. Add an .mdx file to content/projects/ to publish one.",
+  },
+  cheatsheets: {
+    dir: "cheatsheets",
+    basePath: "/cheat-sheets",
+    label: "Cheat Sheets",
+    layout: "cards",
+    empty:
+      "No cheat sheets yet. Add an .mdx file to content/cheatsheets/ to publish one.",
+  },
+} as const;
+
+export type Collection = keyof typeof COLLECTIONS;
+
+export const COLLECTION_NAMES = Object.keys(COLLECTIONS) as Collection[];
 
 export type Entry = {
   slug: string;
@@ -23,12 +58,6 @@ export type Entry = {
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
-/** Where each collection is published. */
-const BASE_PATH: Record<Collection, string> = {
-  posts: "/writing",
-  projects: "/projects",
-};
-
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     // Thrown during the build, so a malformed post fails `next build` loudly
@@ -44,7 +73,7 @@ function readingMinutes(body: string) {
 
 function parseEntry(collection: Collection, filename: string): Entry {
   const slug = filename.replace(/\.mdx?$/, "");
-  const filePath = path.join(CONTENT_DIR, collection, filename);
+  const filePath = path.join(CONTENT_DIR, COLLECTIONS[collection].dir, filename);
   const { data, content } = matter(fs.readFileSync(filePath, "utf8"));
   const where = `${collection}/${filename}`;
 
@@ -76,7 +105,7 @@ function parseEntry(collection: Collection, filename: string): Entry {
   return {
     slug,
     collection,
-    href: `${BASE_PATH[collection]}/${slug}`,
+    href: `${COLLECTIONS[collection].basePath}/${slug}`,
     title: data.title,
     date,
     summary: data.summary,
@@ -95,7 +124,7 @@ function parseEntry(collection: Collection, filename: string): Entry {
  * production builds so pushing an unfinished post is harmless.
  */
 export function getEntries(collection: Collection): Entry[] {
-  const dir = path.join(CONTENT_DIR, collection);
+  const dir = path.join(CONTENT_DIR, COLLECTIONS[collection].dir);
   if (!fs.existsSync(dir)) return [];
 
   return fs
@@ -130,4 +159,38 @@ export function formatDate(date: string) {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** Every entry across every collection, newest first. */
+export function getAllEntries(): Entry[] {
+  return COLLECTION_NAMES.flatMap((name) => getEntries(name)).sort((a, b) =>
+    b.date.localeCompare(a.date),
+  );
+}
+
+/**
+ * Flattens MDX to searchable, quotable text.
+ *
+ * Code and table cells are kept, not stripped: on a site full of cheat sheets
+ * the most valuable search terms — `SUMX`, `XLOOKUP`, `groupby`, `reflog` —
+ * live almost entirely inside fenced blocks and tables. Only the syntax markers
+ * are removed.
+ */
+export function toPlainText(body: string) {
+  return body
+    .replace(/^\s*```.*$/gm, " ") // fence lines, keeping the code between them
+    .replace(/<[^>]+>/g, " ") // JSX/HTML tags, keeping their children
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ") // images
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links -> their text
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "") // heading markers
+    .replace(/^\s{0,3}>\s?/gm, "") // blockquote markers
+    .replace(/^\s{0,3}[-*+]\s+/gm, "") // bullets
+    .replace(/^\s*\|?[\s:|-]{6,}\|?\s*$/gm, " ") // table separator rows
+    .replace(/\|/g, " ") // table cell delimiters, keeping the cells
+    // Underscores are deliberately left alone: stripping them as emphasis
+    // markers would turn dense_rank into denserank, and snake_case identifiers
+    // are exactly what people search for here.
+    .replace(/[`*~]/g, "") // emphasis and code markers
+    .replace(/\s+/g, " ")
+    .trim();
 }

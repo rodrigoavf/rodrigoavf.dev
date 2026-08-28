@@ -1,0 +1,60 @@
+---
+title: dbt for people who already know SQL
+date: 2026-06-30
+summary: If you can write a SELECT, you are most of the way there. The rest is file layout and two macros.
+tags: [dbt, sql, data-engineering]
+---
+
+dbt gets described as a transformation framework, which makes it sound bigger
+than it is. In practice: you write `SELECT` statements in files, and dbt works
+out what order to run them in and materialises each one as a table or view.
+
+## A model is a file
+
+`models/staging/stg_orders.sql`:
+
+```sql
+select
+    id as order_id,
+    customer_id,
+    cast(created_at as date) as order_date,
+    amount_cents / 100.0 as amount
+from {{ source('shop', 'orders') }}
+```
+
+No `CREATE TABLE`, no `INSERT`. The filename becomes the relation name.
+
+## The one thing that makes it click
+
+`ref()` — referencing another model rather than a table name:
+
+```sql
+select
+    o.customer_id,
+    count(*) as orders,
+    sum(o.amount) as lifetime_value
+from {{ ref('stg_orders') }} o
+group by 1
+```
+
+Because you wrote `ref()` instead of a hardcoded name, dbt knows this model
+depends on `stg_orders` and builds them in the right order. That dependency
+graph is most of dbt's value.
+
+## Tests are YAML
+
+```yaml
+models:
+  - name: stg_orders
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+```
+
+`dbt test` runs them as `SELECT` statements looking for rows that should not
+exist. If any come back, the test fails.
+
+## What it does not do
+
+dbt does not extract or load anything. It transforms data already in your
+warehouse. Getting it there is a separate job.

@@ -1,0 +1,59 @@
+---
+title: Git commands worth memorising
+date: 2026-07-04
+summary: The dozen commands that cover almost everything, plus how to undo the three mistakes everyone makes.
+tags: [git, tooling]
+---
+
+## Daily
+
+```bash
+git status                    # what has changed
+git diff                      # what changed, in detail
+git add -p                    # stage selectively, hunk by hunk
+git commit -m "message"
+git pull --rebase             # get others' work without a merge commit
+git push
+```
+
+`git add -p` is the one worth learning properly. It walks you through each change
+and asks whether to stage it, which makes small, coherent commits easy.
+
+## Branching
+
+```bash
+git switch -c my-branch       # create and switch
+git switch main               # switch back
+git branch -d my-branch       # delete once merged
+```
+
+## Undoing things
+
+| Mistake | Fix |
+| --- | --- |
+| Wrong commit message | `git commit --amend` |
+| Committed too early | `git reset --soft HEAD~1` |
+| Want to discard local changes to a file | `git restore <file>` |
+| Need to park work briefly | `git stash` then `git stash pop` |
+
+<Callout type="warning" title="Amend and reset rewrite history">
+Both are safe on commits you have not pushed. Once a commit is on a shared
+branch, changing it forces everyone else to fix their copy.
+</Callout>
+
+## Seeing what happened
+
+```bash
+git log --oneline -20
+git log -p <file>             # history of one file, with diffs
+git blame <file>              # who last touched each line, and when
+```
+
+## The escape hatch
+
+```bash
+git reflog
+```
+
+Every position `HEAD` has been in, including states you thought you destroyed.
+If you have lost a commit, it is almost certainly here.

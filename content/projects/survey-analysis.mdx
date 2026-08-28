@@ -1,0 +1,40 @@
+---
+title: Survey response analysis
+date: 2026-05-28
+summary: 12,000 free-text responses categorised, cross-tabulated and turned into something a committee could act on.
+tags: [python, analysis]
+---
+
+## The problem
+
+An annual survey with 12,000 responses, most of the value locked in two
+free-text questions nobody had time to read.
+
+## The approach
+
+Coding the responses by hand was out. Instead, a first pass grouped responses by
+similarity, then those groups were reviewed and named by a human — much faster
+than reading everything, and the categories stayed defensible because a person
+chose them.
+
+```python
+import pandas as pd
+
+responses = pd.read_csv("responses.csv")
+themes = (
+    responses
+    .assign(theme=responses["comment"].map(classify))
+    .groupby(["theme", "department"])
+    .size()
+    .unstack(fill_value=0)
+)
+```
+
+## What mattered
+
+- **Keeping the raw text.** Every aggregate could be traced back to the
+  responses behind it, which is what made the findings survive scrutiny.
+- **Cross-tabulating by department**, since the interesting result was not what
+  people said, but who said it.
+- **Reporting counts, not percentages**, for small departments. A percentage of
+  nine responses reads as more than it is.

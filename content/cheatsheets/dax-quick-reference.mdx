@@ -1,0 +1,67 @@
+---
+title: DAX quick reference
+date: 2026-08-02
+summary: The patterns that come up constantly — time intelligence, filter context, and the difference between the two X functions.
+tags: [power-bi, dax]
+---
+
+## Measure vs calculated column
+
+| | Evaluated | Use when |
+| --- | --- | --- |
+| Calculated column | Once, at refresh, row by row | You need to slice or filter by the value |
+| Measure | At query time, in filter context | You need to aggregate |
+
+When in doubt, write a measure. Columns cost memory whether used or not.
+
+## The aggregation pair
+
+```dax
+Total Sales = SUM ( Sales[Amount] )
+
+Total Sales = SUMX ( Sales, Sales[Quantity] * Sales[Price] )
+```
+
+`SUM` adds up one existing column. `SUMX` walks the table row by row evaluating
+an expression, then adds the results. Use `SUMX` when the thing you want does
+not exist as a column.
+
+## CALCULATE
+
+```dax
+Sales Last Year =
+CALCULATE ( [Total Sales], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+```
+
+`CALCULATE` changes the filter context an expression is evaluated in. Almost
+every non-trivial measure is a `CALCULATE`.
+
+## Time intelligence
+
+```dax
+Sales YTD   = CALCULATE ( [Total Sales], DATESYTD ( 'Date'[Date] ) )
+Sales MTD   = CALCULATE ( [Total Sales], DATESMTD ( 'Date'[Date] ) )
+Sales PY    = CALCULATE ( [Total Sales], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+YoY %       = DIVIDE ( [Total Sales] - [Sales PY], [Sales PY] )
+```
+
+All of these need a real date table, contiguous, marked as a date table.
+
+## Removing filters
+
+```dax
+% of Total = DIVIDE ( [Total Sales], CALCULATE ( [Total Sales], ALL ( Product ) ) )
+```
+
+`ALL` clears filters entirely. `ALLSELECTED` keeps what the user chose in
+slicers but clears the visual's own context — usually what you actually want for
+a "% of total" in a chart.
+
+## Always DIVIDE
+
+```dax
+Margin % = DIVIDE ( [Profit], [Sales] )
+```
+
+`DIVIDE` returns blank on divide-by-zero. `/` returns an error that propagates
+through everything downstream.

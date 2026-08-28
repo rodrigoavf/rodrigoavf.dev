@@ -36,6 +36,8 @@ content/
     star-schema-basics.mdx           → /writing/star-schema-basics
   projects/
     sales-dashboard.mdx              → /projects/sales-dashboard
+  cheatsheets/
+    dax-quick-reference.mdx          → /cheat-sheets/dax-quick-reference
 
 public/
   images/
@@ -45,6 +47,14 @@ public/
   downloads/
     vlookup-sample.xlsx              → only small files (see Downloads below)
 ```
+
+Three collections, same format in each — only the folder differs:
+
+| Put it in            | It appears on   | Shown as   |
+| -------------------- | --------------- | ---------- |
+| `content/posts`      | `/writing`      | dated rows |
+| `content/projects`   | `/projects`     | cards      |
+| `content/cheatsheets`| `/cheat-sheets` | cards      |
 
 **The filename is the URL.** `how-to-vlookup-in-excel.mdx` becomes
 `/writing/how-to-vlookup-in-excel`. Use lowercase words separated by hyphens, no
@@ -363,6 +373,16 @@ safe there. It's only loose prose you need to watch.
 - HTML comments don't work. Use `{/* this is an MDX comment */}` instead.
 
 ---
+
+## Search
+
+Nothing to do — every entry is indexed when the site builds, across all three
+collections. Visitors search with the box in the header or by pressing ⌘K
+(Ctrl+K on Windows).
+
+Worth knowing when writing: **code blocks and table cells are searchable**, not
+just prose. Someone looking for `XLOOKUP` or `groupby` will find the cheat sheet
+that only mentions it inside a code fence. Drafts are never indexed.
 
 ## Checklist before pushing
 

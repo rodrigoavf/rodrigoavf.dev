@@ -1,59 +1,63 @@
 import { notFound } from "next/navigation";
 import { EntryCards, EntryList } from "@/components/entry-list";
 import { PageShell } from "@/components/page-shell";
-import { getEntries, getTags } from "@/lib/content";
+import {
+  COLLECTIONS,
+  COLLECTION_NAMES,
+  getEntries,
+  type Collection,
+} from "@/lib/content";
 
 type Props = { params: Promise<{ tag: string }> };
 
-/** Every tag used by either collection. */
-function allTags() {
-  return [
-    ...new Set([
-      ...getTags("posts").map((t) => t.tag),
-      ...getTags("projects").map((t) => t.tag),
-    ]),
-  ];
+function entriesByCollection(tag: string) {
+  return COLLECTION_NAMES.map((name) => ({
+    name,
+    entries: getEntries(name).filter((entry) => entry.tags.includes(tag)),
+  })).filter((group) => group.entries.length > 0);
 }
 
 export function generateStaticParams() {
-  return allTags().map((tag) => ({ tag }));
+  const tags = new Set(
+    COLLECTION_NAMES.flatMap((name) =>
+      getEntries(name).flatMap((entry) => entry.tags),
+    ),
+  );
+  return [...tags].map((tag) => ({ tag }));
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { tag } = await params;
+  const tag = decodeURIComponent((await params).tag);
   return {
-    title: `Tagged “${decodeURIComponent(tag)}”`,
-    description: `Posts and projects tagged ${decodeURIComponent(tag)}.`,
+    title: `Tagged “${tag}”`,
+    description: `Everything tagged ${tag}.`,
   };
 }
 
 export default async function TagPage({ params }: Props) {
   const tag = decodeURIComponent((await params).tag).toLowerCase();
+  const groups = entriesByCollection(tag);
+  if (groups.length === 0) notFound();
 
-  const posts = getEntries("posts").filter((e) => e.tags.includes(tag));
-  const projects = getEntries("projects").filter((e) => e.tags.includes(tag));
-  if (posts.length === 0 && projects.length === 0) notFound();
-
-  const total = posts.length + projects.length;
+  const total = groups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
     <PageShell
       title={`Tagged “${tag}”`}
       intro={`${total} ${total === 1 ? "entry" : "entries"}.`}
     >
-      {posts.length > 0 ? (
-        <section>
-          <h2 className="mb-6 text-xl font-semibold tracking-tight">Writing</h2>
-          <EntryList entries={posts} />
+      {groups.map((group, index) => (
+        <section key={group.name} className={index > 0 ? "mt-14" : undefined}>
+          <h2 className="mb-6 text-xl font-semibold tracking-tight">
+            {COLLECTIONS[group.name as Collection].label}
+          </h2>
+          {COLLECTIONS[group.name as Collection].layout === "list" ? (
+            <EntryList entries={group.entries} />
+          ) : (
+            <EntryCards entries={group.entries} />
+          )}
         </section>
-      ) : null}
-
-      {projects.length > 0 ? (
-        <section className={posts.length > 0 ? "mt-14" : undefined}>
-          <h2 className="mb-6 text-xl font-semibold tracking-tight">Projects</h2>
-          <EntryCards entries={projects} />
-        </section>
-      ) : null}
+      ))}
     </PageShell>
   );
 }

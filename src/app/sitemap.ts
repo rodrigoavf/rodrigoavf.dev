@@ -1,32 +1,39 @@
 import type { MetadataRoute } from "next";
-import { getEntries, getTags } from "@/lib/content";
+import {
+  COLLECTIONS,
+  COLLECTION_NAMES,
+  getAllEntries,
+  getEntries,
+} from "@/lib/content";
 import { site } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const posts = getEntries("posts");
-  const projects = getEntries("projects");
+  const entries = getAllEntries();
 
-  const tags = [
-    ...new Set([
-      ...getTags("posts").map((t) => t.tag),
-      ...getTags("projects").map((t) => t.tag),
-    ]),
-  ];
+  const tags = new Set(
+    COLLECTION_NAMES.flatMap((name) =>
+      getEntries(name).flatMap((entry) => entry.tags),
+    ),
+  );
 
-  const staticPages = ["", "/writing", "/projects", "/about"].map((path) => ({
+  const staticPages = [
+    "",
+    ...COLLECTION_NAMES.map((name) => COLLECTIONS[name].basePath),
+    "/about",
+  ].map((path) => ({
     url: `${site.url}${path}`,
     changeFrequency: "weekly" as const,
     priority: path === "" ? 1 : 0.8,
   }));
 
-  const entryPages = [...posts, ...projects].map((entry) => ({
+  const entryPages = entries.map((entry) => ({
     url: `${site.url}${entry.href}`,
     lastModified: entry.date,
     changeFrequency: "monthly" as const,
     priority: 0.7,
   }));
 
-  const tagPages = tags.map((tag) => ({
+  const tagPages = [...tags].map((tag) => ({
     url: `${site.url}/tags/${tag}`,
     changeFrequency: "monthly" as const,
     priority: 0.3,

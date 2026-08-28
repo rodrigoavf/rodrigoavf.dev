@@ -1,0 +1,65 @@
+---
+title: Regex for data cleaning
+date: 2026-06-11
+summary: The small subset of regular expressions that covers most messy-column problems.
+tags: [regex, python, tooling]
+---
+
+## The pieces worth knowing
+
+| Pattern | Matches |
+| --- | --- |
+| `\d` | A digit |
+| `\w` | Letter, digit or underscore |
+| `\s` | Any whitespace |
+| `.` | Any character |
+| `+` | One or more of the previous |
+| `*` | Zero or more |
+| `?` | Optional |
+| `^` `$` | Start / end of the string |
+| `[abc]` | Any one of a, b, c |
+| `[^abc]` | Anything except a, b, c |
+
+Capitalise a class to invert it: `\D` is "not a digit".
+
+## Trimming the junk
+
+```python
+df["code"] = df["code"].str.replace(r"\s+", " ", regex=True).str.strip()
+```
+
+Collapses runs of whitespace — including the non-breaking spaces that arrive
+with anything copied out of a web page.
+
+## Pulling a number out of text
+
+```python
+df["amount"] = (
+    df["raw"].str.extract(r"([\d,]+\.?\d*)")[0]
+    .str.replace(",", "", regex=False)
+    .astype(float)
+)
+```
+
+## Capture groups
+
+Brackets capture. Splitting a `REGION-0042` style code:
+
+```python
+df[["region", "id"]] = df["code"].str.extract(r"^([A-Z]+)-(\d+)$")
+```
+
+Anchoring with `^` and `$` means a row that does not fit the pattern becomes
+`NaN` rather than silently matching part of something else. That is usually what
+you want — it turns a bad assumption into visible missing data.
+
+## The greedy trap
+
+`.*` matches as much as it can. Given `<a><b>`, the pattern `<.*>` matches the
+whole string, not `<a>`. Add `?` to make it lazy: `<.*?>`.
+
+<Callout>
+Test patterns on the rows you expect to fail, not the ones you expect to pass.
+A pattern that matches nothing is obvious; one that matches slightly too much is
+not.
+</Callout>

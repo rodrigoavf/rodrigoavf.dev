@@ -1,0 +1,67 @@
+---
+title: Window functions, explained without the jargon
+date: 2026-08-06
+summary: Running totals, rankings and "compare each row to its group" — all without a self join.
+tags: [sql, tutorial]
+---
+
+A window function looks at a set of rows around the current row and computes
+something, without collapsing them the way `GROUP BY` does. That is the whole
+concept. The syntax is what puts people off.
+
+## The shape
+
+```sql
+<function>() over (
+    partition by <what splits the rows into groups>
+    order by     <what orders them inside a group>
+)
+```
+
+`partition by` is "start counting again when this changes". `order by` is "in
+what order", and is what makes running totals and rankings possible.
+
+## A running total
+
+```sql
+select
+    order_date,
+    customer_id,
+    amount,
+    sum(amount) over (
+        partition by customer_id
+        order by order_date
+    ) as running_total
+from orders
+order by customer_id, order_date;
+```
+
+Each row keeps its own detail *and* gains the total so far for that customer.
+With `GROUP BY` you would have lost the detail.
+
+## Ranking within a group
+
+```sql
+select
+    customer_id,
+    order_id,
+    amount,
+    row_number() over (partition by customer_id order by amount desc) as rn
+from orders
+qualify rn <= 3;
+```
+
+That gives the three largest orders per customer. `qualify` is the tidy way to
+filter on a window function — it exists in Snowflake, BigQuery and DuckDB. In
+Postgres or SQL Server, wrap it in a subquery instead.
+
+## The three ranking functions
+
+| Function       | Ties get           | Gaps after ties |
+| -------------- | ------------------ | --------------- |
+| `row_number()` | Different numbers  | No              |
+| `rank()`       | The same number    | Yes             |
+| `dense_rank()` | The same number    | No              |
+
+Pick `row_number()` when you need exactly one row per group, `dense_rank()` when
+ties should genuinely share a position.

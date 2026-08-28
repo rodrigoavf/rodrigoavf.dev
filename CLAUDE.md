@@ -45,27 +45,30 @@ src/
     layout.tsx            root layout: header, footer, fonts, metadata
     page.tsx              home page
     globals.css           design tokens, themes, prose styles
-    writing/page.tsx      post index
-    writing/[slug]/       a post
-    projects/page.tsx     project index
-    projects/[slug]/      a project
+    writing/              post index + [slug]
+    projects/             project index + [slug]
+    cheat-sheets/         cheat sheet index + [slug]
     tags/[tag]/           everything sharing a tag
     feed.xml/route.ts     RSS
+    search-index.json/    the static search index
     sitemap.ts robots.ts  SEO
     not-found.tsx         404
   components/
     mdx/                  components usable inside posts + the renderer
     entry-list.tsx        post rows, project cards, tag pills
     entry-page.tsx        the shared article layout
+    search-dialog.tsx     the search UI
     theme-toggle.tsx      light/dark switch
     theme-script.tsx      pre-paint theme, avoids a flash
   lib/
     site.ts               name, nav, links, metadata
-    content.ts            reads and validates content/, the content API
+    content.ts            collections, reads and validates content/
+    search.ts             ranking, shared by the dialog and its tests
     image-size.ts         intrinsic image dimensions, read at build time
 content/
   posts/*.mdx             a post per file; filename = URL slug
   projects/*.mdx          same, for projects
+  cheatsheets/*.mdx       same, for cheat sheets
 public/                   static assets served at /
 HowToEdit.mdx             authoring cheat sheet (personal reference, not a page)
 ```
@@ -85,7 +88,14 @@ something markdown can't express — a Power BI embed, a callout, a chart — a
 component can be dropped inline. This is what resolves the "will markdown handle
 images and embeds?" concern: it does, without locking anything down.
 
-Shape:
+There are three collections, defined in one place — `COLLECTIONS` in
+`src/lib/content.ts`:
+
+| Directory            | URL             | Index layout |
+| -------------------- | --------------- | ------------ |
+| `content/posts`      | `/writing`      | dated rows   |
+| `content/projects`   | `/projects`     | cards        |
+| `content/cheatsheets`| `/cheat-sheets` | cards        |
 
 ```
 content/
@@ -93,7 +103,13 @@ content/
     how-to-vlookup-in-excel.mdx
   projects/
     some-dashboard.mdx
+  cheatsheets/
+    dax-quick-reference.mdx
 ```
+
+**To add a collection**, add an entry to `COLLECTIONS` and copy one of the
+route pairs under `src/app/`. Tag pages, the sitemap and search all iterate over
+`COLLECTIONS`, so they pick it up with no further changes.
 
 Each file starts with YAML frontmatter:
 
@@ -160,31 +176,54 @@ workflow — Vercel rebuilds on push.
 
 ## Current state
 
-The mechanics are complete and tested. What is missing is **content** — the
-site ships with example files that exist to demonstrate the pipeline.
+The mechanics are complete and tested. What is missing is **your own content** —
+everything in `content/` today is an example written to populate the pages, and
+is meant to be deleted.
 
 Working:
 
-- MDX pipeline: frontmatter parsing and validation, `[slug]` routes for posts and
-  projects, indexes, tag pages, drafts, reading time.
+- MDX pipeline: frontmatter parsing and validation, `[slug]` routes for all three
+  collections, indexes, tag pages, drafts, reading time.
 - Authoring components: `<Figure>`, `<Callout>`, `<PowerBIEmbed>`, `<YouTube>`,
   `<Embed>`; markdown images routed through `next/image` with dimensions measured
   from the file at build time.
 - Syntax highlighting via Shiki, emitting both themes as CSS variables so a theme
   switch needs no re-highlight.
 - Light/dark themes with a toggle, an OS-preference default, and no flash on load.
+- Client-side search over every collection (see below).
 - `sitemap.xml`, `robots.txt`, RSS at `/feed.xml`, per-page OpenGraph metadata.
 
 Not built:
 
-- Dynamic OG images (`opengraph-image.tsx`) — posts currently fall back to the
-  `cover` image where one is set.
-- Search, pagination, and comments. None are worth adding until there is enough
-  content to need them.
+- Dynamic OG images (`opengraph-image.tsx`) — entries fall back to the `cover`
+  image where one is set.
+- Pagination and comments. Neither is worth adding until there is enough content
+  to need them.
 
-**Delete when real content arrives:** `content/posts/example-post.mdx`,
-`content/posts/draft-example.mdx`, `content/projects/example-project.mdx`,
-`public/images/posts/example-post/`, `public/downloads/example.csv`.
+**Delete when real content arrives:** everything under `content/`, plus
+`public/images/posts/example-post/` and `public/downloads/example.csv`.
+
+## Search
+
+Search is entirely static and client-side — there is no server to query, which
+keeps it inside the Hobby tier.
+
+`/search-index.json` is a route handler marked `force-static`, so it is built
+once at deploy time. `<SearchDialog>` fetches it the first time someone opens
+search (never on a normal page load), caches it for the session, and ranks
+matches with `src/lib/search.ts`.
+
+Two things there are deliberate and easy to undo by accident:
+
+- **`toPlainText` keeps code and table text.** On a site of cheat sheets the
+  best search terms — `SUMX`, `XLOOKUP`, `groupby` — live almost entirely inside
+  fenced blocks and tables. Stripping them makes search look broken.
+- **Underscores are not stripped** as emphasis markers, because doing so turns
+  `dense_rank` into `denserank`.
+
+The index is a few KB gzipped. If it ever passes a few hundred KB — well over a
+hundred entries — index titles, summaries and tags only, or move to a real
+inverted index.
 
 ## Content rules enforced at build time
 

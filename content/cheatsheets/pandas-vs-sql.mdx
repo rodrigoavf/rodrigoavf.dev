@@ -1,0 +1,61 @@
+---
+title: Pandas ↔ SQL
+date: 2026-08-18
+summary: The same operation in both, side by side. For when you know one and are reaching for the other.
+tags: [python, sql, pandas]
+---
+
+## Selecting
+
+| SQL | pandas |
+| --- | --- |
+| `select * from t` | `df` |
+| `select a, b from t` | `df[["a", "b"]]` |
+| `select distinct a from t` | `df["a"].drop_duplicates()` |
+| `select * from t limit 10` | `df.head(10)` |
+
+## Filtering
+
+```sql
+select * from orders where amount > 100 and status = 'paid';
+```
+
+```python
+orders[(orders["amount"] > 100) & (orders["status"] == "paid")]
+```
+
+Each condition needs its own brackets — `&` binds tighter than `>` in Python.
+
+## Grouping
+
+```sql
+select customer_id, count(*) as n, sum(amount) as total
+from orders group by customer_id;
+```
+
+```python
+orders.groupby("customer_id").agg(n=("amount", "size"), total=("amount", "sum"))
+```
+
+## Joining
+
+| SQL | pandas |
+| --- | --- |
+| `inner join` | `df.merge(other, on="id")` |
+| `left join` | `df.merge(other, on="id", how="left")` |
+| `full outer join` | `df.merge(other, on="id", how="outer")` |
+
+## Window functions
+
+```sql
+sum(amount) over (partition by customer_id order by order_date)
+```
+
+```python
+orders.sort_values("order_date").groupby("customer_id")["amount"].cumsum()
+```
+
+## The one that catches everyone
+
+`GROUP BY` in SQL drops the other columns. `groupby` in pandas moves the key
+into the index — add `.reset_index()` to get a flat frame back.

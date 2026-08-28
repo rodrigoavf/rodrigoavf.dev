@@ -1,0 +1,59 @@
+---
+title: VLOOKUP, INDEX/MATCH, XLOOKUP — which to actually use
+date: 2026-07-22
+summary: Three ways to do the same job, twenty years apart. Only one is worth learning today.
+tags: [excel, tutorial]
+---
+
+If you are writing a lookup today and your Excel supports it, use `XLOOKUP`.
+Everything below is context for why, and what to do when you meet the older two
+in someone else's file.
+
+## The problem with VLOOKUP
+
+```excel
+=VLOOKUP(A2, Products!A:D, 3, FALSE)
+```
+
+Three things go wrong with this:
+
+1. **The key must be the leftmost column.** If it is not, you rearrange the
+   sheet or give up.
+2. **The `3` is a position, not a name.** Insert a column in `Products` and the
+   formula silently returns the wrong data. No error — just wrong numbers.
+3. **Forgetting `FALSE`** gives you an approximate match, which on unsorted data
+   returns nonsense.
+
+<Callout type="warning" title="The silent failure is the real problem">
+A formula that breaks loudly is an inconvenience. `VLOOKUP` returning the column
+next door after someone inserts a column is a wrong number in a report nobody
+notices for a month.
+</Callout>
+
+## INDEX/MATCH
+
+```excel
+=INDEX(Products!C:C, MATCH(A2, Products!A:A, 0))
+```
+
+Read it inside out: `MATCH` finds *which row*, `INDEX` fetches *from which
+column*. The key can be anywhere, and both references are real columns, so
+inserting a column moves them correctly.
+
+## XLOOKUP
+
+```excel
+=XLOOKUP(A2, Products!A:A, Products!C:C, "Not found")
+```
+
+Lookup value, where to search, what to return. Exact match by default, a
+built-in "not found" argument, and it searches in any direction.
+
+| | Key position | Survives inserts | Default match |
+| --- | --- | --- | --- |
+| `VLOOKUP` | Leftmost only | No | Approximate |
+| `INDEX/MATCH` | Anywhere | Yes | Exact |
+| `XLOOKUP` | Anywhere | Yes | Exact |
+
+Learn `INDEX/MATCH` well enough to read it, because it is everywhere. Write
+`XLOOKUP`.

@@ -1,0 +1,38 @@
+---
+title: Regional sales dashboard
+date: 2026-08-10
+summary: A Power BI report replacing a 40-tab spreadsheet that took two days a month to assemble by hand.
+tags: [power-bi, dax, modelling]
+---
+
+## The problem
+
+Monthly regional reporting was a spreadsheet: one tab per region, assembled by
+hand from four exports, reconciled by eye. Two days of someone's month, and by
+the time it was finished it was three weeks out of date.
+
+## What I built
+
+A star-schema model over the same four sources, refreshed nightly, with the
+report built on top.
+
+| Layer     | Tool                        |
+| --------- | --------------------------- |
+| Sources   | ERP export, CRM API, two CSVs |
+| Transform | Power Query                 |
+| Model     | Star schema, 1 fact + 5 dimensions |
+| Report    | Power BI, 4 pages           |
+
+## Decisions worth recording
+
+- **One fact table at order-line grain.** Everything else aggregates up from
+  there. Resisting a second fact table kept the filter behaviour predictable.
+- **A proper date dimension**, marked as a date table, so time intelligence
+  works without special cases.
+- **Measures, not calculated columns**, wherever the result depends on filter
+  context.
+
+## The result
+
+Two days of manual assembly became a nightly refresh. The reconciliation step
+disappeared, because there was no longer anything to reconcile.
