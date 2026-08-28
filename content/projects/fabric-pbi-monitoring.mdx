@@ -586,41 +586,39 @@ The email body, subject and recipient are obtained by PBI measures, some of wich
 />
 
 Here are all the steps needed to recreate the Power Automate Cloud Flow I have.
-Step 1: Set Up the Flow & Trigger
+**Step 1: Set Up the Flow & Trigger**
 - Log in to Power Automate.
 - Click + Create > Automated cloud flow (or edit directly inside the Power Automate visual in Power BI Desktop).
 - Search for Power BI and select the trigger: On Power BI button clicked.
-- Name the flow: Catalog Inventory Analysis - Email.
+- Name the flow: `Catalog Inventory Analysis - Email`.
 
-Step 2: Add an "Apply to each" Loop
+**Step 2: Add an "Apply to each" Loop**
 - Click + New step (or the + icon below the trigger block).
 - Search for Control and select Apply to each.
 - Click into the Select an output from previous steps field.
-- Select Power BI values from the Dynamic Content menu (Expression: @triggerBody()?['entity']?['Power BI values']).
+- Select Power BI values from the Dynamic Content menu (Expression: `@triggerBody()?['entity']?['Power BI values']`).
 
-Step 3: Add the Filter Condition
+**Step 3: Add the Filter Condition**
 - Inside the Apply to each container, click Add an action.
 - Search for Control and select Condition.
+- Build the logic rule:
+  - Left value: Select `PA_Owner` from Dynamic Content (Expression: `items('Apply_to_each')?['PA_Owner']`).
+  - Operator: Select contains.
+  - Right value: Type `NO_EMAIL`.
 
-Build the logic rule:
-- Left value: Select PA_Owner from Dynamic Content (Expression: items('Apply_to_each')?['PA_Owner']).
-- Operator: Select contains.
-- Right value: Type NO_EMAIL.
-
-Step 4: Configure the Email Action
-- Leave the If yes (True) branch empty so records marked NO_EMAIL are skipped.
+**Step 4: Configure the Email Action**
+- Leave the If yes (True) branch empty so when no valid email is selected in the PBI `NO_EMAIL` are skipped.
 - Under the If no (False) branch, click Add an action.
 - Search for Office 365 Outlook and select Send an email (V2).
+- Map the parameters using Dynamic Content:
+  - To: Select `PA_Owner`
+  - Subject: Select `PA_Email_Subject`
+  - Body: Select `PA_Email_Body`
+  - Importance: Set to `Normal`
 
-Map the parameters using Dynamic Content:
-- To: Select PA_Owner
-- Subject: Select PA_Email_Subject
-- Body: Select PA_Email_Body
-- Importance: Set to Normal
-
-Step 5: Save and Connect to Power BI
+**Step 5: Save and Connect to Power BI**
 - Click Save in the top right corner.
-- Ensure your Power BI report visual feeds the fields PA_Owner, PA_Email_Subject, and PA_Email_Body into the Power Automate data well so the variables populate dynamically during runtime.
+- Ensure your Power BI report visual feeds the fields `PA_Owner`, `PA_Email_Subject`, and `PA_Email_Body` into the Power Automate data well so the variables populate dynamically during runtime.
 
 <Callout type="warning" title="Before embedding the live report">
 This report surfaces real owner names, workspace names, item names, a direct link to each item and much more from
