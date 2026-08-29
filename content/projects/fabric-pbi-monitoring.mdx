@@ -12,7 +12,7 @@ Tracking everything in Fabric is difficult, especially when you're not a Fabric 
 While working for a client, I noticed that in many of their workspaces, numerous items were failing to refresh. Some had been failing for over two years, yet no one seemed to care about fixing or deleting them.
 
 That annoyed me, and I wanted to fix it. I wanted to know, across everything I could see, what was failing to refresh, who owned it, and how long it had been broken, so I could nudge the owner to take action.
-Unfortunately, none of the built-in options answer that need well.
+`Unfortunately, none of the built-in options answer that need well`.
 
 - **OneLake catalog explorer** has most of the fields I need, but filtering
   is shallow and there is no way to see everything at once. You browse one
@@ -26,14 +26,11 @@ Unfortunately, none of the built-in options answer that need well.
   three, except it only shows items I own. Everything owned by anyone else
   is invisible, which defeats the point of an overview.
 
-None of them give a single really useful filterable surface with a way to act on what it shows. So I built one.
+None of them give a single really useful filterable surface with a way to act on what it shows. `So I built one`.
 
 ## What I built
 
-A small pipeline that collects everything I have access to across the
-tenant, lands it as a Delta table, and serves it through the same
-modelling layer I'd use for a regular PBI report, plus a button that emails the
-owner of anything broken.
+A small pipeline that collects everything I have access to across the tenant, lands it as a Delta table, and serves it through the same modelling layer I'd use for a regular PBI report, plus a button that emails the owner of anything broken.
 
 | Layer          | Tool                                     |
 | -------------- | ----------------------------------------- |
@@ -56,7 +53,7 @@ permissions to ask for.
 
 ## Collecting the inventory
 
-A PySpark notebook runs on a schedule, walks every workspace and item I have
+A `PySpark notebook` runs on a schedule, walks every workspace and item I have
 access to, and pulls owner, item type, workspace, last refresh time and
 refresh status for each. The result gets written to a Delta table: append
 the run, keep history, so if a collegue runs the notebook instead of me, the items he has access and I don't get added to the table without removing items I have access to and my collegue does not.
@@ -562,13 +559,7 @@ built-in options couldn't do well. Here it's just slicers on a table.
   caption="Filtered to failures, with the HTML-content visual previewing the email each owner is about to get."
 />
 
-That second page uses a custom visual from the Power BI marketplace that
-renders HTML. A few measures build the email body: a table of the owner's
-failing items, since-when, and a plain ask to look at them, as an HTML
-string, and the visual renders it exactly as the recipient will see it
-before anything is sent. Being able to check the wording and formatting in
-the report itself, rather than trusting whatever the flow generates blind,
-was worth the extra visual.
+That second page uses a custom visual from the Power BI marketplace that renders HTML. A few measures build the email body: a table of the owner's failing items, since-when, and a plain ask to look at them, as an HTML string, and the visual renders it exactly as the recipient will see it before anything is sent. Being able to check the wording and formatting in the report itself, rather than trusting whatever the flow generates blind, was worth the extra visual.
 
 ## Closing the loop: notifying owners
 
@@ -629,7 +620,7 @@ other report on this site.
 
 ## The result
 
-A clean Power BI report with everything I need, one row per item
+==A clean Power BI report== with everything I need, one row per item
 latest refresh date and status, filterable by owner, workspace, item type, date, and more, with a button that tells
 the right person their thing is broken instead of me finding it by chance in
 Monitor Hub.
