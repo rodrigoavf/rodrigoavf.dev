@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { stripHighlightMarkers } from "./remark-tone-highlight";
 
 /**
  * Every content collection, in nav order.
@@ -177,7 +178,7 @@ export function getAllEntries(): Entry[] {
  * are removed.
  */
 export function toPlainText(body: string) {
-  return body
+  return stripHighlightMarkers(body)
     .replace(/^\s*```.*$/gm, " ") // fence lines, keeping the code between them
     .replace(/<[^>]+>/g, " ") // JSX/HTML tags, keeping their children
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ") // images

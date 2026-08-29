@@ -111,7 +111,8 @@ Ordinary markdown, below the frontmatter.
 ```mdx
 ## A section heading
 
-Regular text. **Bold**, *italic*, `inline code`, and ~~strikethrough~~.
+Regular text. **Bold**, *italic*, `inline code`, ~~strikethrough~~, and
+==coloured text==.
 
 - A bullet
 - Another bullet
@@ -133,6 +134,23 @@ outline.
 
 A blank line between blocks is what separates them. Two paragraphs with no blank
 line between them become one paragraph.
+
+### Coloured text
+
+`==like this==` colours the text in whatever hue the page already uses: cyan in
+a post, amber in a project, turquoise in a cheat sheet. Nothing to declare, no
+component to import, and the same file would come out in a different colour if
+it moved to another collection.
+
+Two rules:
+
+- The `==` must hug the text. `==yes==`, never `== no ==`. That is what keeps an
+  ordinary `if a == b` in a sentence from turning colourful.
+- It works on plain text only, so `==**both**==` will not fire. Put the emphasis
+  outside instead: `**==both==**`.
+
+It is ignored inside inline code and fenced code blocks, so `` `a == b` `` stays
+exactly as typed.
 
 ### Callouts
 

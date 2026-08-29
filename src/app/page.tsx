@@ -18,8 +18,9 @@ export default function Home() {
           overflow, and a negative z-index hid it behind the body background. */}
       <div className="hero-glow border-b border-border">
         <Container>
-          {/* The portrait is bottom-aligned so its crop line lands on the
-              section's bottom border rather than floating mid-air. */}
+          {/* The portrait is bottom-aligned and carries the same bottom
+              padding as the text column, so its base lands level with the two
+              buttons rather than below them. */}
           <section className="flex flex-col gap-10 pt-20 sm:pt-28 lg:flex-row lg:items-end lg:gap-12">
             <div className="pb-20 sm:pb-28 lg:flex-1">
               <p className="font-mono text-sm text-accent">
@@ -49,7 +50,7 @@ export default function Home() {
 
             <Portrait
               priority
-              className="w-48 self-center sm:w-56 lg:w-72 lg:self-end"
+              className="w-48 self-center sm:w-56 lg:w-72 lg:self-end lg:pb-28"
               sizes="(min-width: 1024px) 288px, 224px"
             />
           </section>

@@ -83,9 +83,11 @@ that same SVG. `public/logo-mark.svg` is the standalone mark for anywhere
 outside the app.
 
 `public/Rodrigo_Portrait.png` is a cut-out with a real alpha channel, rendered by
-`<Portrait>`. It carries a soft brand-coloured glow (so the figure is grounded
-rather than floating) and a short bottom fade (the source is cropped
-mid-shoulder, and the hard edge would otherwise read as a mistake). It is
+`<Portrait>`. Nothing is painted behind it — no glow, no frame. Its one
+treatment is a short bottom fade (the source is cropped mid-shoulder, and the
+hard edge would otherwise read as a mistake); keep the fade narrow, since a
+taller one eats into the figure. On the home page it carries the same bottom
+padding as the text column so its base sits level with the hero buttons. It is
 519x480, so do not render it much wider than ~300px.
 
 `HowToEdit.mdx` at the repo root is the owner's own reference for writing posts
@@ -225,6 +227,13 @@ placeholder:
   `border-tone`) resolves to that collection's colour. This is what stops the
   site reading as monochrome, and it carries meaning: colour tells you what kind
   of thing you are looking at, in cards, tags and search results alike.
+- **`==text==` in a post body renders in that collection's tone.** A remark
+  plugin (`src/lib/remark-tone-highlight.ts`) rewrites it to
+  `<mark class="tone-mark">`, which `globals.css` paints with `var(--tone)` and
+  no background fill. Both delimiters must hug their text, which is what keeps
+  `if a == b` out of it, and only `text` nodes are visited, so code is untouched.
+  `toPlainText` strips the same markers via `stripHighlightMarkers`, so they
+  never leak into the search index — keep the two in step.
 - `--on-accent` is the text colour to use on an `--accent` fill. It flips
   between themes, because the accent is dark on light and light on dark — a
   hardcoded white button label would vanish in dark mode.
@@ -285,6 +294,8 @@ Working:
 
 - MDX pipeline: frontmatter parsing and validation, `[slug]` routes for all three
   collections, indexes, tag pages, drafts, reading time.
+- Tag filters at the top of all three indexes (`/writing`, `/projects`,
+  `/cheat-sheets`), linking to the shared `/tags/[tag]` pages.
 - Authoring components: `<Figure>`, `<Callout>`, `<PowerBIEmbed>`, `<YouTube>`,
   `<Embed>`; markdown images routed through `next/image` with dimensions measured
   from the file at build time.

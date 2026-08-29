@@ -4,6 +4,7 @@ import rehypePrettyCode from "rehype-pretty-code";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 import remarkUnwrapImages from "remark-unwrap-images";
+import { remarkToneHighlight } from "@/lib/remark-tone-highlight";
 import { mdxComponents } from "./index";
 
 /**
@@ -19,7 +20,7 @@ export function MdxContent({ source }: { source: string }) {
         mdxOptions: {
           // unwrapImages lifts a lone image out of its paragraph, so it can
           // span the full width instead of being trapped in the text column.
-          remarkPlugins: [remarkGfm, remarkUnwrapImages],
+          remarkPlugins: [remarkGfm, remarkUnwrapImages, remarkToneHighlight],
           rehypePlugins: [
             rehypeSlug,
             [

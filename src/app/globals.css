@@ -296,6 +296,15 @@ body {
   word-break: break-word;
 }
 
+/* ==highlighted text== from a post body. It carries no background of its own:
+   the point is the collection's colour, and a fill would fight the tone pills
+   and inline code that already use one. */
+.prose mark.tone-mark {
+  background: none;
+  color: var(--tone);
+  font-weight: 500;
+}
+
 .callout-body > * + * {
   margin-top: 0.75em;
 }
@@ -468,22 +477,13 @@ body {
 /* ---------------------------------------------------------------------------
    Portrait.
 
-   The source PNG is a cut-out cropped mid-shoulder. The glow grounds it so it
-   does not float, and the fade softens the crop line at the bottom.
+   The cut-out sits straight on the page, with nothing painted behind it. The
+   source PNG is cropped mid-shoulder, so a short fade at the very bottom lets
+   the crop line dissolve into the page background instead of ending on a hard
+   edge. Keep it short — a taller fade eats into the figure itself.
 --------------------------------------------------------------------------- */
 
-.portrait-glow {
-  border-radius: 9999px;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in oklab, var(--tone-cheatsheets) 22%, transparent),
-    color-mix(in oklab, var(--tone-posts) 10%, transparent) 65%,
-    transparent 100%
-  );
-  filter: blur(6px);
-}
-
 .portrait-fade {
-  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 93%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 93%, transparent 100%);
 }

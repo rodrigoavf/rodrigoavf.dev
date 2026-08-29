@@ -1,6 +1,6 @@
-import { EntryCards } from "@/components/entry-list";
+import { EntryCards, TagList } from "@/components/entry-list";
 import { EmptyState, PageShell } from "@/components/page-shell";
-import { getEntries } from "@/lib/content";
+import { getEntries, getTags } from "@/lib/content";
 
 export const metadata = {
   title: "Projects",
@@ -9,6 +9,7 @@ export const metadata = {
 
 export default function ProjectsPage() {
   const projects = getEntries("projects");
+  const tags = getTags("projects");
 
   return (
     <PageShell
@@ -16,6 +17,12 @@ export default function ProjectsPage() {
       title="Projects"
       intro="Dashboards, pipelines and tools I have built."
     >
+      {tags.length > 0 ? (
+        <div className="mb-10">
+          <TagList tags={tags} />
+        </div>
+      ) : null}
+
       {projects.length > 0 ? (
         <EntryCards entries={projects} />
       ) : (
