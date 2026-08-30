@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { TocItem } from "@/lib/toc";
 
 /**
@@ -8,6 +11,30 @@ import type { TocItem } from "@/lib/toc";
  * the (unchanged) container.
  */
 export function Toc({ items }: { items: TocItem[] }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const headings = items
+      .map((item) => document.getElementById(item.id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (headings.length === 0) return;
+
+    // A thin detection band near the top of the viewport (below the sticky
+    // header). The heading that crosses into it — scrolling in either
+    // direction — becomes the active one.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveId(entry.target.id);
+        }
+      },
+      { rootMargin: "-96px 0px -70% 0px" },
+    );
+
+    headings.forEach((heading) => observer.observe(heading));
+    return () => observer.disconnect();
+  }, [items]);
+
   if (items.length === 0) return null;
 
   return (
@@ -22,7 +49,9 @@ export function Toc({ items }: { items: TocItem[] }) {
           <li key={item.id}>
             <a
               href={`#${item.id}`}
-              className="text-muted transition-colors hover:text-tone"
+              className={`transition-colors hover:text-tone ${
+                item.id === activeId ? "text-tone" : "text-muted"
+              }`}
             >
               {item.text}
             </a>
