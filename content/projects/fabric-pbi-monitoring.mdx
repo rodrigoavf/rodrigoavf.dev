@@ -1,10 +1,3 @@
----
-title: Monitoring every Fabric and Power BI item without being the admin
-date: 2026-08-28
-summary: A PySpark-to-Power-BI pipeline giving a single, filterable view of every item I can see (owner, last refresh, status) with a one-click email to whoever owns something that's failing.
-tags: [power-bi, fabric, data-engineering, power-automate]
----
-
 ## The problem
 
 Tracking everything in Fabric is difficult, especially when you're not a Fabric admin or the Power BI admin.
@@ -14,14 +7,14 @@ While working for a client, I noticed that in many of their workspaces, numerous
 That annoyed me, and I wanted to fix it. I wanted to know, across everything I could see, what was failing to refresh, who owned it, and how long it had been broken, so I could nudge the owner to take action.
 `Unfortunately, none of the built-in options answer that need well`.
 
-- **OneLake catalog explorer** has most of the fields I need, but filtering
+- **==OneLake catalog explorer==** has most of the fields I need, but filtering
   is shallow and there is no way to see everything at once. You browse one
   item at a time.
-- **Fabric Monitor Hub** is closer to what I want, but it's a run log, not an
+- **==Fabric Monitor Hub==** is closer to what I want, but it's a run log, not an
   inventory: every refresh is a new row, so the same report can appear a
   dozen times a day. There's no way to ask "what is broken right now" without
   wading through history, and no way to contact an owner from there.
-- **The OneLake Catalog Governance report** (the Power BI report Microsoft
+- **==The OneLake Catalog Governance report==** (the Power BI report Microsoft
   ships over the governance semantic model) is genuinely the best view of the
   three, except it only shows items I own. Everything owned by anyone else
   is invisible, which defeats the point of an overview.
@@ -30,16 +23,17 @@ None of them give a single really useful filterable surface with a way to act on
 
 ## What I built
 
-A small pipeline that collects everything I have access to across the tenant, lands it as a Delta table, and serves it through the same modelling layer I'd use for a regular PBI report, plus a button that emails the owner of anything broken.
+A small pipeline that collects everything I have access to across the tenant, lands it as a Delta table, and serves it through a regular layer I'd use for a PBI report, plus a button that emails the owner of anything broken.
 
-| Layer          | Tool                                     |
-| -------------- | ----------------------------------------- |
-| Collection     | PySpark notebook (Fabric)                 |
-| Storage        | Delta table                               |
-| Query layer    | SQL analytics endpoint                    |
-| Model          | Power BI semantic model                   |
-| Report         | Power BI, with an HTML-content visual      |
-| Notification   | Power Automate cloud flow, triggered from the report |
+| Layer        | Tool                                                 |
+| ------------ | ---------------------------------------------------- |
+| Collection   | PySpark notebook (Fabric)                            |
+| Storage      | Delta table                                          |
+| Query layer  | SQL analytics endpoint                               |
+| Model        | Power BI semantic model                              |
+| Report       | Power BI, with an HTML-content visual                |
+| Notification | Power Automate cloud flow, triggered from the report |
+|              |                                                      |
 
 <Figure
   src="/images/posts/fabric-pbi-monitoring/architecture.png"
@@ -47,16 +41,12 @@ A small pipeline that collects everything I have access to across the tenant, la
   caption="Notebook to Delta table to SQL endpoint to semantic model to report: the same shape as any other Fabric pipeline, just aimed at Fabric itself."
 />
 
-Nothing here is exotic. That's deliberate: it's the same stack I'd use for
-any other report, which means no new tool to maintain and no extra
-permissions to ask for.
+Nothing here is exotic. That's deliberate: it's the same stack I'd use for any other report, which means no new tool to maintain and no extra permissions to ask for.
 
 ## Collecting the inventory
 
-A `PySpark notebook` runs on a schedule, walks every workspace and item I have
-access to, and pulls owner, item type, workspace, last refresh time and
-refresh status for each. The result gets written to a Delta table: append
-the run, keep history, so if a collegue runs the notebook instead of me, the items he has access and I don't get added to the table without removing items I have access to and my collegue does not.
+A `PySpark notebook` walks every workspace and item I have access to, and pulls owner, item type, workspace name and id, last refresh time and refresh status for each, among other infos. The result gets written to a Delta table: append the run, keep history, so if a colleague runs the notebook instead of me, the items he has access and I don't get added to the table without removing items I have access to and my colleague does not.
+As a notebook and the resulting delta table from it live in a Lakehouse, and every Lakehouse has its own SQL Analytics Endpoint in Microsoft Fabric, the Delta table's data will also show up there, where it can be queried using Spark SQL. It is also where the semantic model is created to later be used in the final Power BI report.
 
 ```python
 import base64
@@ -530,19 +520,14 @@ except Exception as global_err:
     print(f"FAILED: Script execution encountered a critical error: {global_err}")
 ```
 
-Landing raw runs rather than overwriting a single "current state" table is
-what makes the failing-since-when question answerable later, and it's also
-what avoids the duplicate-entries problem Monitor Hub has. The report
-below reduces this to one row per item, current status only, with the full
-history sitting underneath for anyone who needs it.
 
 ## From Delta table to report
 
-The SQL analytics endpoint reads the Delta table directly, so there's no
-separate export or copy step. The semantic model on top adds the usual
-things a raw log doesn't have: a "current status" measure per item (last run
-only, not every run), days-since-last-success, and a flag for anything
-that's been red for more than one refresh cycle.
+The SQL analytics endpoint reads the Delta table directly, so there's no separate export or copy step.
+
+The only table used in the semantic model is the one created by the notebook, but we will add a few measures on top that will help us later with the email sending.
+
+The table alone gives us all the information and the filtering ability the built-in options couldn't do well, and using only it's fields we can get to the first page of the report where we can see all the items, item type, who owns what, directly link to each, refresh status among some other useful metrics. Here it's just slicers on a table.
 
 <Figure
   src="/images/posts/fabric-pbi-monitoring/report-overview.png"
@@ -550,24 +535,246 @@ that's been red for more than one refresh cycle.
   caption="Everything I have access to, one row per item, filterable by owner, workspace, item type and status."
 />
 
-Filtering on owner, workspace, item type and refresh status is what the
-built-in options couldn't do well. Here it's just slicers on a table.
+
+On the second page is where we nudge people. It uses a custom visual from the Power BI marketplace that renders HTML. A few measures build the email body: a table of the owner's failing items, since-when, and a plain ask to look at them, as an HTML string, and the visual renders it exactly as the recipient will see it before anything is sent. By selecting a person on the left side visual the email is loaded and we are one click away from notifying them they need to take action on failing refreshes on Fabric items.
+
+There is a page level filter here to only show item with failing refresh status.
 
 <Figure
-  src="/images/posts/fabric-pbi-monitoring/report-failing.png"
-  alt="Power BI report page filtered to items with a failed refresh status, showing how long each has been failing and an HTML-rendered preview of the email that will be sent"
+  src="/images/posts/fabric-pbi-monitoring/report-email.png"
+  alt="Power BI report page filtered to items with a failed refresh status, showing how long each has been failing and an HTML-rendered preview of the email that will be sent to the owner's email"
   caption="Filtered to failures, with the HTML-content visual previewing the email each owner is about to get."
 />
 
-That second page uses a custom visual from the Power BI marketplace that renders HTML. A few measures build the email body: a table of the owner's failing items, since-when, and a plain ask to look at them, as an HTML string, and the visual renders it exactly as the recipient will see it before anything is sent. Being able to check the wording and formatting in the report itself, rather than trusting whatever the flow generates blind, was worth the extra visual.
+## Measures for the email
+
+These are all the measures you'll need to get the same result I have.
+
+==**WorkspaceLink**== will give you the full URL for a workspace.
+
+```dax
+WorkspaceLink = "https://app.fabric.microsoft.com/groups/" & SELECTEDVALUE(catalog_inventory_analysis[WorkspaceId])`
+```
+
+==**Workspace Admin Data**==gives um a nice table in HTML with all admins of the selected workspaces.
+
+```dax
+Workspace Admins Data = 
+VAR DistinctWorkspaces = 
+    SUMMARIZE(
+        'catalog_inventory_analysis',
+        'catalog_inventory_analysis'[WorkspaceId],
+        "WS_Name", MAX('catalog_inventory_analysis'[WorkspaceName]),
+        "WS_Names", MAX('catalog_inventory_analysis'[WorkspaceAdmins]),
+        "WS_Emails", MAX('catalog_inventory_analysis'[WorkspaceAdminEmails])
+    )
+
+RETURN
+CONCATENATEX(
+    DistinctWorkspaces,
+    VAR CurrentWS = [WS_Name]
+    VAR RawNames = [WS_Names]
+    VAR RawEmails = [WS_Emails]
+
+    -- Normalize delimiters (handle both "; " and ";") to DAX path format ("|")
+    VAR NamesPath = SUBSTITUTE(SUBSTITUTE(RawNames, "; ", "|"), ";", "|")
+    VAR EmailsPath = SUBSTITUTE(SUBSTITUTE(RawEmails, "; ", "|"), ";", "|")
+
+    VAR ItemCount = PATHLENGTH(NamesPath)
+
+    -- Pair each name with its corresponding email
+    VAR PairedTable = 
+        ADDCOLUMNS(
+            GENERATESERIES(1, ItemCount),
+            "@Name", TRIM(PATHITEM(NamesPath, [Value])),
+            "@Email", TRIM(PATHITEM(EmailsPath, [Value]))
+        )
+
+    -- Build HTML table rows matching corporate preview styling
+    VAR HtmlRows = 
+        CONCATENATEX(
+            PairedTable,
+            "<tr>" & 
+                "<td style='padding: 8px 12px; border-bottom: 1px solid #eeeeee; color: #242424;'>" & [@Name] & "</td>" & 
+                "<td style='padding: 8px 12px; border-bottom: 1px solid #eeeeee;'><a href='mailto:" & [@Email] & "' style='color: #0078d4; text-decoration: none;'>" & [@Email] & "</a></td>" & 
+            "</tr>",
+            ""
+        )
+
+    RETURN
+    IF(
+        NOT ISBLANK(RawNames),
+        "<div style='font-family: Segoe UI, sans-serif; margin-bottom: 16px;'>" &
+            "<div style='margin-bottom: 6px; color: #242424;'><b>" & CurrentWS & "</b></div>" &
+            "<table style='border-collapse: collapse; width: 100%; border: 1px solid #e1e1e1;'>" &
+                "<thead>" &
+                    "<tr style='background-color: #f4f4f4; text-align: left;'>" &
+                        "<th style='padding: 8px 12px; border-bottom: 2px solid #0078d4; color: #333333;'>Nome</th>" &
+                        "<th style='padding: 8px 12px; border-bottom: 2px solid #0078d4; color: #333333;'>E-mail</th>" &
+                    "</tr>" &
+                "</thead>" &
+                "<tbody>" & 
+                    HtmlRows & 
+                "</tbody>" &
+            "</table>" &
+        "</div>",
+        BLANK()
+    ),
+    ""
+)
+```
+
+**==Email_Message_HTML==** is what gets rendered in Power BI on the email preview.
+
+```dax
+Email_Message_HTML = 
+VAR IsSingleOwner = [PA_Owner] <> "NO_EMAIL"
+VAR OwnerName = SELECTEDVALUE(catalog_inventory_analysis[OwnerName], "Colaborador(a)")
+VAR CorpoEmail = [PA_Email_Body]
+
+VAR PreviewPBI_HTML = 
+    "<div style=""color: #242424; line-height: 1.6; padding: 16px; background-color: #ffffff; border: 1px solid #e1e1e1; border-radius: 8px; font-family: Segoe UI, sans-serif;"">" &
+        "<div style=""background-color: #f4f4f4; border-left: 4px solid #0078d4; padding: 8px 12px; margin-bottom: 16px; font-size: 13px; color: #333333;"">" &
+            "ℹ️ <strong>Informação de Envio:</strong> Este e-mail será enviado para <strong>" & OwnerName & "</strong>, com conhecimento (CC) a <strong>Ana Teresa Neves</strong> e <strong>Eduardo Mendes Rocha</strong>." &
+        "</div>" &
+        "<p style=""margin-top: 0; margin-bottom: 12px;""><strong>Assunto:</strong> [IMPORTANTE] Revisão e Limpeza de Itens no Fabric/Power BI </p>" &
+        "<hr style=""border: 0; border-top: 1px solid #eeeeee; margin: 12px 0;"" />" &
+        CorpoEmail &
+    "</div>"
+
+VAR AlertaHTML = 
+    "<div style=""color: #8a6d3b; background-color: #fcf8e3; border: 1px solid #faebcc; padding: 12px 16px; border-radius: 6px; font-family: Segoe UI, sans-serif;"">" &
+        "⚠️ <strong>Atenção:</strong> Selecione um único responsável (Owner) no filtro para visualizar a mensagem de e-mail." &
+    "</div>"
+
+RETURN
+    IF(NOT IsSingleOwner, AlertaHTML, PreviewPBI_HTML)
+```
+
+
+**PA_Owner** Gets the email of the selected owner. It also serves as a control to either send and email or not. In case no valid owner has been selected this measure will server as conditional in the Power Automate Flow to not send out any emails.
+
+```dax
+PA_Owner = 
+IF(
+    HASONEVALUE(catalog_inventory_analysis[Owner]) &&
+    DISTINCTCOUNT(catalog_inventory_analysis[Id]) = CALCULATE(COUNTA(catalog_inventory_analysis[OwnerType]), catalog_inventory_analysis[OwnerType] = "Person"), 
+    SELECTEDVALUE(catalog_inventory_analysis[Owner]),
+    "NO_EMAIL"
+)
+```
+
+**==PA_Email_Subject==** holds the email subject.
+
+```dax
+PA_Email_Subject = 
+IF(
+    HASONEVALUE(catalog_inventory_analysis[Owner]),
+    "[IMPORTANTE] Revisão e Limpeza de Itens no Fabric/Power BI",
+    BLANK()
+)
+```
+
+
+**==PA_Email_Body==** is the actual HTML code send on the Power Automate Flow on the email.
+
+```dax
+PA_Email_Body = 
+VAR IsSingleOwner = HASONEVALUE(catalog_inventory_analysis[Owner])
+VAR OwnerName = SELECTEDVALUE(catalog_inventory_analysis[OwnerName], "Colaborador(a)")
+VAR TotalFailedItems = DISTINCTCOUNT(catalog_inventory_analysis[Id])
+VAR UltimaAtualizacaoGeral = FORMAT(MAX(catalog_inventory_analysis[LastRefreshTime]), "dd/mm/yyyy")
+
+-- Estrutura HTML: Agrupa os itens por Workspace em tabelas compactas com links
+VAR ListaPorWorkspaceHTML = 
+    CONCATENATEX(
+        VALUES(catalog_inventory_analysis[WorkspaceName]), 
+        VAR CurrentWS = catalog_inventory_analysis[WorkspaceName]
+        VAR CurrentWSId = CALCULATE(SELECTEDVALUE(catalog_inventory_analysis[WorkspaceId]), catalog_inventory_analysis[WorkspaceName] = CurrentWS)
+        VAR CurrentWSLink = CALCULATE([WorkspaceLink], catalog_inventory_analysis[WorkspaceName] = CurrentWS)
+        
+        VAR WSLinkFormatado = 
+            IF(
+                ISBLANK(CurrentWSId) || CurrentWSId = "", 
+                CurrentWS, 
+                "<a href=""" & CurrentWSLink & """ style=""color: #0078d4; text-decoration: none; font-weight: 600;"" target=""_blank"">" & CurrentWS & "</a>"
+            )
+        VAR ItensTabela = 
+            CALCULATETABLE(
+                SUMMARIZE(
+                    catalog_inventory_analysis, 
+                    catalog_inventory_analysis[Name], 
+                    catalog_inventory_analysis[Type],
+                    catalog_inventory_analysis[ItemLink],
+                    catalog_inventory_analysis[LastRefreshTime]
+                ),
+                catalog_inventory_analysis[WorkspaceName] = CurrentWS
+            )
+        VAR ListaItens = 
+            CONCATENATEX(
+                ItensTabela,
+                VAR ItemName = catalog_inventory_analysis[Name]
+                VAR ItemType = catalog_inventory_analysis[Type]
+                VAR ItemLink = catalog_inventory_analysis[ItemLink]
+                VAR ItemDate = catalog_inventory_analysis[LastRefreshTime]
+                VAR DataFormatada = IF(ISBLANK(ItemDate), "Sem registo", FORMAT(ItemDate, "dd/mm/yyyy"))
+                VAR LinkFormatado = 
+                    IF(
+                        ISBLANK(ItemLink) || ItemLink = "", 
+                        ItemName, 
+                        "<a href=""" & ItemLink & """ style=""color: #0078d4; text-decoration: none; font-weight: 600; word-break: break-word;"" target=""_blank"">" & ItemName & "</a>"
+                    )
+                RETURN 
+                    "<tr>" &
+                        "<td style=""padding: 8px 10px; border-bottom: 1px solid #e1e1e1; word-break: break-word;"">" & LinkFormatado & "</td>" &
+                        "<td style=""padding: 8px 10px; border-bottom: 1px solid #e1e1e1; color: #555555; word-break: break-word;"">" & ItemType & "</td>" &
+                        "<td style=""padding: 8px 10px; border-bottom: 1px solid #e1e1e1; color: #555555; word-break: break-word;"">" & DataFormatada & "</td>" &
+                    "</tr>",
+                ""
+            )
+        RETURN 
+            "<div style=""margin-top: 16px; margin-bottom: 16px;"">" &
+                "<p style=""margin: 0 0 6px 0; font-size: 14px;""><strong>Workspace:</strong> " & WSLinkFormatado & "</p>" &
+                "<table style=""width: 80%; max-width: 700px; table-layout: fixed; border-collapse: collapse; font-size: 13px; text-align: left; background-color: #ffffff; border: 1px solid #e1e1e1;"">" &
+                    "<thead>" &
+                        "<tr style=""background-color: #f4f4f4; border-bottom: 2px solid #e1e1e1; color: #333333;"">" &
+                            "<th style=""width: 55%; padding: 8px 10px;"">Item</th>" &
+                            "<th style=""width: 20%; padding: 8px 10px;"">Tipo</th>" &
+                            "<th style=""width: 20%; padding: 8px 10px;"">Última Atualização</th>" &
+                        "</tr>" &
+                    "</thead>" &
+                    "<tbody>" &
+                        ListaItens &
+                    "</tbody>" &
+                "</table>" &
+            "</div>",
+        ""
+    )
+
+VAR MensagemHTML = 
+    "<p>Olá, <strong>" & OwnerName & "</strong>,</p>" &
+    "<p>Identificámos que é o(a) responsável por <strong>" & TotalFailedItems & "</strong> item(ns) no ambiente Fabric/Power BI com falhas de atualização ou sem atualizar desde ao menos <strong>" & UltimaAtualizacaoGeral & "</strong>.</p>" &
+    "<p style=""margin-bottom: 0;""><strong>Lista de itens por Workspace:</strong></p>" &
+    ListaPorWorkspaceHTML &
+    "<p>Para manter a governação dos Workspaces e libertar capacidade de processamento, solicitamos a sua colaboração para:</p>" &
+    "<ol style=""margin-top: 5px; padding-left: 20px;"">" &
+        "<li>Validar a fonte de dados e ajustar a atualização caso o recurso ainda seja utilizado.</li>" &
+        "<li>Realizar a eliminação do item caso já não seja necessário.</li>" &
+    "</ol>" &
+    "<div style=""color: #a80000; background-color: #fdf2f2; border-left: 4px solid #d13438; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0;"">" &
+        "<strong>⚠️ AVISO IMPORTANTE:</strong> Dispõe de um prazo de <strong>5 dias</strong> a contar desta data para tomar as devidas ações ou responder a este e-mail. Caso não seja registada qualquer ação ou resposta dentro deste prazo, os itens listados poderão ser eliminados ou desativados por nossa equipa." &
+    "</div>" &
+    "<p style=""margin-bottom: 0;"">Com os melhores cumprimentos,<br/><strong>Equipa T2D Data & AI Delivery</strong></p>"
+
+RETURN
+    IF(IsSingleOwner, MensagemHTML, BLANK())
+```
 
 ## Closing the loop: notifying owners
 
-A button on the report triggers a Power Automate cloud flow (the standard
-Power Automate visual, wired to the current filter context). The flow takes
-the filtered set of failing items for the selected owner, and sends them the email previewed on the page above, asking them to look at what's
-broken.
-The email body, subject and recipient are obtained by PBI measures, some of wich output HTML code that is viewed in the dedicated HTML visuals and used in the email body, so it looks nice.
+A button on the report triggers a Power Automate cloud flow (the standard Power Automate visual, wired to the current filter context). The flow takes the filtered set of failing items for the selected owner, and sends them the email previewed on the page above, asking them to look at what's broken.
+
+The email body, subject and recipient are obtained by PBI measures, some of which output HTML code that is viewed in the dedicated HTML visuals and used in the email body, so it looks nice.
 
 <Figure
   src="/images/posts/fabric-pbi-monitoring/power-automate-flow.png"
@@ -620,7 +827,7 @@ other report on this site.
 
 ## The result
 
-==A clean Power BI report with everything I need==, one row per item latest refresh date and status, filterable by owner, workspace, item type, date, and more, with a button that tells the right person their thing is broken instead of me finding it by chance in Monitor Hub.
+A clean Power BI report with everything I need, one row per item latest refresh date and status, filterable by owner, workspace, item type, date, and more, with a button that tells the right person their thing is broken instead of me finding it by chance in Monitor Hub.
 
 ## What I would change
 
