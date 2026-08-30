@@ -2,12 +2,15 @@ import Link from "next/link";
 import { Container } from "@/components/container";
 import { MdxContent } from "@/components/mdx/mdx-content";
 import { Figure } from "@/components/mdx/figure";
+import { Toc } from "@/components/toc";
 import { formatDate, type Entry } from "@/lib/content";
+import { getToc } from "@/lib/toc";
 
 /** The shared article layout for a single post or project. */
 export function EntryPage({ entry, backTo }: { entry: Entry; backTo: { href: string; label: string } }) {
   return (
     <Container className="py-12 sm:py-16" data-tone={entry.collection}>
+      <Toc items={getToc(entry.body)} />
       <Link
         href={backTo.href}
         className="font-mono text-sm text-muted transition-colors hover:text-tone"
