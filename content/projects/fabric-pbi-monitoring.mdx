@@ -561,13 +561,13 @@ There is a page level filter here to only show item with failing refresh status.
 
 These are all the measures you'll need to get the same result I have.
 
-==**WorkspaceLink**== will give you the full URL for a workspace.
+**==WorkspaceLink==** will give you the full URL for a workspace.
 
 ```dax
 WorkspaceLink = "https://app.fabric.microsoft.com/groups/" & SELECTEDVALUE(catalog_inventory_analysis[WorkspaceId])`
 ```
 
-==**Workspace Admin Data**==gives um a nice table in HTML with all admins of the selected workspaces.
+**==Workspace Admin Data==** gives um a nice table in HTML with all admins of the selected workspaces.
 
 ```dax
 Workspace Admins Data = 
@@ -663,7 +663,7 @@ RETURN
 ```
 
 
-**PA_Owner** Gets the email of the selected owner. It also serves as a control to either send and email or not. In case no valid owner has been selected this measure will server as conditional in the Power Automate Flow to not send out any emails.
+**==PA_Owner==** Gets the email of the selected owner. It also serves as a control to either send and email or not. In case no valid owner has been selected this measure will server as conditional in the Power Automate Flow to not send out any emails.
 
 ```dax
 PA_Owner = 
