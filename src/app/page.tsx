@@ -50,8 +50,8 @@ export default function Home() {
 
             <Portrait
               priority
-              className="w-48 self-center sm:w-56 lg:w-72 lg:self-end lg:pb-28"
-              sizes="(min-width: 1024px) 288px, 224px"
+              className="w-64 self-center sm:w-72 lg:w-96 lg:self-end lg:pb-28"
+              sizes="(min-width: 1024px) 384px, (min-width: 640px) 288px, 256px"
             />
           </section>
         </Container>
