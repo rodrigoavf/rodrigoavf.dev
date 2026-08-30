@@ -828,14 +828,6 @@ Here are all the steps needed to recreate the Power Automate Cloud Flow I have.
 - Click Save in the top right corner.
 - Ensure your Power BI report visual feeds the fields `PA_Owner`, `PA_Email_Subject`, and `PA_Email_Body` into the Power Automate data well so the variables populate dynamically during runtime.
 
-<Callout type="warning" title="Before embedding the live report">
-This report surfaces real owner names, workspace names, item names, a direct link to each item and much more from
-the client's tenant. *Publish to web* makes an embed visible to anyone on
-the internet with no login, so before publishing this one, replace the
-embed with a version built over sanitised or sample data, the same as any
-other report on this site.
-</Callout>
-
 ## The result
 
 A clean Power BI report with everything I need, one row per item latest refresh date and status, filterable by owner, workspace, item type, date, and more, with a button that tells the right person their thing is broken instead of me finding it by chance in Monitor Hub.
