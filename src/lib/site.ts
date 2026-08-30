@@ -5,7 +5,7 @@ export const site = {
   domain: "rodrigoavf.dev",
   url: "https://rodrigoavf.dev",
   tagline:
-    "Data analysis & data engineering — notes, tutorials, and things I build.",
+    "Data analysis & engineering notes, tutorials, and things I build.",
   description:
     "Notes, tutorials and projects on data analysis and data engineering by Rodrigo Ferreira.",
   /** Longer blurb under the headline on the home page. */
