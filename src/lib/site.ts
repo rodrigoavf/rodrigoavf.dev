@@ -31,5 +31,5 @@ export const site = {
    * shifted 13 places; ROT13 is its own inverse, so encoding and decoding are
    * the same operation) — do not paste a plain address here.
    */
-  emailRot13: "enis@bhgybbx.pbz",
+  emailRot13: "ebqevtb@ebqevtbnis.qri",
 } as const;
