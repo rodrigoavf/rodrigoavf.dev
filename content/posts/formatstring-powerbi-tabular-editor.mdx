@@ -1,0 +1,189 @@
+---
+title: A Tabular Editor Script for Bulk Measure Formatting
+date: 2026-08-31
+summary: A C# script for Tabular Editor that batch-sets the correct format string, percent, currency, quantity or DAX-driven, on every selected measure.
+tags: [power-bi, tabular-editor]
+draft: false
+---
+
+## What it is
+
+`FormatString.csx` is a C# script that runs inside Tabular Editor's Advanced Scripting window. Select any number of measures in the Model Explorer, set one variable to say what kind of format you want, run the script, and every selected measure gets the matching format applied in a single pass. No clicking through the Properties pane one measure at a time.
+
+
+## What it does
+
+- **Eight format types, one variable.** Setting `control` to `P`, `Q`, `M`, `N`, `D`, `PP`, `NV`, `DN` or `C` covers percent, quantity, monetary, whole number, decimal, percentage points, whole number variation, decimal variation, and a custom slot you define yourself.
+- **Optional name filter.** Set `nameFilter` to a substring and the script only touches selected measures whose name contains it, so you can select a broad chunk of the model and still target just the `YoY` measures, for example.
+- **Dynamic units.** For the `Q` and `M` types, flipping `qtyDynamic` or `currencyDynamic` to `true` swaps a fixed unit or currency symbol for a DAX `FormatStringExpression` that reads the symbol off a dimension table based on whatever's in the current filter context. Useful on multi-currency or multi-unit models where a plain fixed symbol would be wrong half the time.
+- **A result you can actually read.** It finishes with an `Output()` line reporting how many measures were selected, how many matched the name filter, and how many were updated, so a run that did nothing doesn't look identical to one that worked.
+
+
+## The script
+
+```csharp
+// Write the Format String of the selected measures depending on the measure type
+
+// 1 - Define what type of format to apply to the selected measures
+var control = "P"; //Change here
+// P  = Percent
+// Q  = Quantity
+// M  = Monetary
+// N  = Whole Number
+// D  = Decimal Number
+// PP = Percentual Points
+// NV = Whole Number Variation
+// DN = Decimal Number Variation
+// C  = Custom - Change rule below
+
+// 2 - Optional: only format selected measures whose name contains this text.
+// Leave blank ("") to format every selected measure, regardless of name.
+var nameFilter = "";
+
+// 3 - Quantity (Q) and Custom (C) settings.
+// By default a fixed unit is used for every matched measure. Set qtyDynamic = true
+// only if you want the unit to switch per filter context based on a table - and only
+// if that table actually exists in the model you're running this on.
+var qtyUnit = "";              // e.g. "kg", "L", "un" - shown next to the number
+var qtyDynamic = false;
+var qtyTable = "AUX_DIM_QTD";  // Only used when qtyDynamic = true
+var qtyColumn = "COD";         // Only used when qtyDynamic = true
+
+// 4 - Monetary (M) settings.
+// By default a fixed symbol is used for every matched measure. Set currencyDynamic = true
+// only if you want the symbol to switch per filter context based on a table - and only
+// if that table actually exists in the model you're running this on.
+var currencySymbol = "";               // e.g. "€", "$", "£" - shown next to the number
+var currencyDynamic = false;
+var companyTable = "DIM_COMPANY";          // Only used when currencyDynamic = true
+var companySymbolColumn = "CurrencySymbol";   // Only used when currencyDynamic = true
+
+// 5 - Apply to the selected measures
+if (Selected.Measures.Count > 0)
+{
+    int matched = 0;
+    int updated = 0;
+
+    foreach (var measure in Selected.Measures)
+    {
+        if (!string.IsNullOrEmpty(nameFilter) && !measure.Name.Contains(nameFilter))
+            continue;
+
+        matched++;
+        bool wasUpdated = true;
+
+        if (control == "C")
+        {
+            if (qtyDynamic)
+            {
+                measure.FormatString = null;
+                measure.FormatStringExpression = $@"
+                VAR _qtd =
+                    SELECTEDVALUE ( {qtyTable}[{qtyColumn}] )
+                RETURN
+                    _qtd & ""/hh"" & "" #,0.00;"" & _qtd & ""/hh"" & "" -#,0.00""
+                ";
+            }
+            else
+            {
+                measure.FormatString = qtyUnit + "/hh #,0.00;" + qtyUnit + "/hh -#,0.00";
+                measure.FormatStringExpression = null;
+            }
+        }
+        else if (control == "P")
+        {
+            measure.FormatString = "0.0%;-0.0%;0.0%";
+            measure.FormatStringExpression = null;
+        }
+        else if (control == "Q")
+        {
+            if (qtyDynamic)
+            {
+                measure.FormatString = null;
+                measure.FormatStringExpression = $@"
+                VAR _qtd = SELECTEDVALUE({qtyTable}[{qtyColumn}])
+                RETURN
+                    _qtd & "" #,0.00;"" & _qtd & "" -#,0.00""
+                ";
+            }
+            else
+            {
+                measure.FormatString = qtyUnit + " #,0.00;" + qtyUnit + " -#,0.00";
+                measure.FormatStringExpression = null;
+            }
+        }
+        else if (control == "M")
+        {
+            if (currencyDynamic)
+            {
+                measure.FormatString = null;
+                measure.FormatStringExpression = $@"
+                VAR _company = SELECTEDVALUE({companyTable}[{companySymbolColumn}])
+                VAR _values_company = VALUES({companyTable}[{companySymbolColumn}])
+                RETURN
+                    IF(
+                        COUNTROWS(_values_company) = 1,
+                        _company & "" #,0.00; -#,0.00 ; #,0.00"",
+                        "" #,0.00; -#,0.00 ; #,0.00""
+                    )
+                ";
+            }
+            else
+            {
+                measure.FormatString = currencySymbol + " #,0.00;" + currencySymbol + " -#,0.00;" + currencySymbol + " #,0.00";
+                measure.FormatStringExpression = null;
+            }
+        }
+        else if (control == "N")
+        {
+            measure.FormatString = "#,##0";
+            measure.FormatStringExpression = null;
+        }
+        else if (control == "D")
+        {
+            measure.FormatString = "#,##0.00";
+            measure.FormatStringExpression = null;
+        }
+        else if (control == "PP")
+        {
+            measure.FormatString = null;
+            measure.FormatStringExpression = @"""+###,##0.00 pp; -###,##0.00 pp""";
+        }
+        else if (control == "NV")
+        {
+            measure.FormatString = null;
+            measure.FormatStringExpression = @"""+#,##0; -#,##0""";
+        }
+        else if (control == "DN")
+        {
+            measure.FormatString = null;
+            measure.FormatStringExpression = @"""+###,##0.0; -###,##0.0""";
+        }
+        else
+        {
+            wasUpdated = false;
+        }
+
+        if (wasUpdated) updated++;
+    }
+
+    Output($"{Selected.Measures.Count} measure(s) selected, {matched} matched the name filter, {updated} updated.");
+}
+else
+{
+    // Optional: alert if no measures were selected
+    Output("No measures selected. Please select at least one measure.");
+}
+```
+
+## Using it
+
+1. Open the model in Tabular Editor.
+2. Select the measures you want to format in the Model Explorer tree. Multi-select works fine, and it doesn't need to be a tidy folder, any mix of measures you've Ctrl-clicked into a selection is fair game.
+3. Open the Advanced Scripting window and paste the script in.
+4. Set `control` to the format type you need, plus `nameFilter` if you're narrowing down a bigger selection.
+5. Press F5 and check the `Output` line to see what actually got touched.
+
+## Known limits
+
+The dynamic branches (`qtyDynamic`, `currencyDynamic`) point at table and column names that were specific to the model this was built for. ==Swap `AUX_DIM_QTD` / `DIM_COMPANY` and their columns for your own dimension table before turning either flag on==, or leave them `false` and it'll just use the fixed unit or symbol instead. It also writes straight to the model with no confirmation step beyond Tabular Editor's own undo, so it's worth running it against two or three measures first before pointing it at fifty.

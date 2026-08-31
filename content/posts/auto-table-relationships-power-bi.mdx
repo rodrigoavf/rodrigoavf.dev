@@ -1,0 +1,151 @@
+---
+title: Auto-Creating Star Schema Relationships in Tabular Editor 2
+date: 2026-08-31
+summary: A Tabular Editor 2 script that scans fact tables for surrogate keys and wires up relationships to matching dimension tables automatically.
+tags: [power-bi, tabular-editor, data-modeling]
+draft: false
+---
+
+Wiring up relationships by hand in a big semantic model in Power BI gets tedious fast. Every fact table has a handful of surrogate keys, every one of those needs a matching dimension table, and if you're rebuilding a model or adding a new fact table you end up dragging the same lines in the Tabular Editor diagram view over and over. Miss one and a measure quietly breaks in a way that's annoying to trace back.
+
+My models follow a strict naming convention: surrogate keys are prefixed `SK_`, and every dimension table is prefixed `DIM_`. That's exactly the kind of pattern a script should be doing for me instead of my mouse.
+
+## What it does
+
+Select one or more fact tables in Tabular Editor 2, run the script, and it:
+
+- Loops through every column on the selected tables whose name starts with the configured key prefix (`SK_` by default).
+- Strips the prefix, and a following underscore if there is one, to get the suffix, then looks for a table whose name is exactly `dimPrefix + suffix`. With the default `DIM_`, an `SK_Customer` column resolves to a search for `DIM_Customer`.
+- Checks the dimension table has a column with the exact same name as the source key (so `SK_Customer` on the fact table needs a `SK_Customer` column on `DIM_Customer`, not just any key).
+- Skips the pair if a relationship between those two tables already exists, in either direction.
+- Otherwise creates a many-to-one relationship, active, filtering one direction from dimension to fact.
+- Prints a summary at the end, and a separate list of anything it couldn't resolve: missing dimension table, missing matching column, or an error from the model itself (a data type mismatch, for instance).
+
+The prefixes live in two variables at the top of the script, `skPrefix` and `dimPrefix`, defaulting to `SK_` and `DIM_`. Whatever string you put in `dimPrefix` is exactly what gets prepended to the suffix when building the table name to search for, no hidden characters added in between. So if your model uses `FK`/`Ref` or `Dim_` instead, changing those two lines is all it takes. Every comparison in the script, prefix matching, table lookups, column lookups, is ==case-insensitive==, so `SK_Customer`, `sk_customer` and `Sk_Customer` all resolve to the same relationship.
+
+## The code
+
+```csharp
+// -----------------------
+// 0) Config — change these if your model uses different prefixes
+// -----------------------
+string skPrefix  = "SK_";    // prefix on surrogate key columns, e.g. "SK_Customer"
+string dimPrefix = "DIM_";  // prefix on dimension table names, e.g. "DIM_Customer"
+
+// -----------------------
+// 1) Grab whatever tables are selected
+// -----------------------
+var selectedTables = Selected.Tables;
+if (selectedTables == null || selectedTables.Count == 0)
+{
+    Error("📋 Please select one or more tables before running this script.");
+    return;
+}
+
+// -----------------------
+// 2) NO NEED TO EDIT BELOW
+// -----------------------
+var errors       = new List<string>();
+int successCount = 0;
+
+foreach (var sourceTable in selectedTables)
+{
+    // Loop every column starting with the configured key prefix
+    foreach (var col in sourceTable.Columns
+                                  .Where(c => c.Name.StartsWith(skPrefix, StringComparison.OrdinalIgnoreCase)))
+    {
+        // Derive the suffix (drop the prefix, and an underscore if one follows it)
+        string suffix;
+        if (col.Name.Length > skPrefix.Length && col.Name[skPrefix.Length] == '_')
+            suffix = col.Name.Substring(skPrefix.Length + 1);
+        else
+            suffix = col.Name.Substring(skPrefix.Length);
+
+        // dimPrefix already includes any separator (e.g. "DIM_"), so this is a plain concatenation
+        string dimTableName = dimPrefix + suffix;
+
+        // ——— EXISTENCE CHECK ———
+        // Only create if there is no existing relationship between these two tables
+        bool exists = Model.Relationships.Any(r =>
+            (r.FromColumn.Table.Name.Equals(sourceTable.Name, StringComparison.OrdinalIgnoreCase)
+          && r.ToColumn.Table.Name.Equals(dimTableName,    StringComparison.OrdinalIgnoreCase))
+         || (r.FromColumn.Table.Name.Equals(dimTableName,    StringComparison.OrdinalIgnoreCase)
+          && r.ToColumn.Table.Name.Equals(sourceTable.Name, StringComparison.OrdinalIgnoreCase))
+        );
+
+        if (exists)
+        {
+            // Already wired up → count as success & skip
+            successCount++;
+            continue;
+        }
+
+        // Locate the dimension table
+        var dimTable = Model.Tables
+            .FirstOrDefault(t => t.Name.Equals(dimTableName, StringComparison.OrdinalIgnoreCase));
+
+        if (dimTable == null)
+        {
+            errors.Add("[" + col.Name + "] dimension table '" + dimTableName + "' not found.");
+            continue;
+        }
+
+        // Verify the key column exists on the dim table (case-insensitive match)
+        var dimColumn = dimTable.Columns
+            .FirstOrDefault(c => c.Name.Equals(col.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (dimColumn == null)
+        {
+            errors.Add("[" + dimTableName + "." + col.Name + "] column not found on '" + dimTableName + "'.");
+            continue;
+        }
+
+        //  ——— CREATE THE RELATIONSHIP ———
+        try
+        {
+            var rel = Model.AddRelationship();
+            rel.FromColumn             = sourceTable.Columns[col.Name];
+            rel.ToColumn               = dimColumn;
+            rel.FromCardinality        = RelationshipEndCardinality.Many;
+            rel.ToCardinality          = RelationshipEndCardinality.One;
+            rel.CrossFilteringBehavior = CrossFilteringBehavior.OneDirection;
+            rel.IsActive               = true;
+
+            successCount++;
+        }
+        catch (Exception ex)
+        {
+            errors.Add(
+                "[" + dimTableName + "." + col.Name
+              + " → " + sourceTable.Name + "." + col.Name
+              + "] @ " + ex.Message
+            );
+        }
+    }
+}
+
+// 3) SUMMARY
+Info("✅ Created or skipped " + successCount + " relationships successfully.");
+
+if (errors.Count > 0)
+{
+    Error(
+      "⚠️ Failed to create the following relationships:\n"
+    + string.Join("\n", errors)
+    );
+}
+```
+
+## How it saves time
+
+The part that matters most is the ==existence check==. Without it, running this twice on the same tables would either throw on every already-wired relationship or duplicate them, so it's what makes the script safe to re-run after adding a couple of new tables to a model instead of having to remember exactly which ones are new.
+
+The other detail worth calling out is that it doesn't just guess a key column on the dimension side. It requires the same column name to exist on `dimPrefix + suffix` as on the fact table. That's a deliberate constraint tied to how I name keys: if the names don't line up exactly, in any casing, the script leaves it alone and reports it rather than wiring the wrong column.
+
+Drop it into Tabular Editor 2's Advanced Scripting window, adjust `skPrefix` and `dimPrefix` at the top if your model's keys and dimension tables aren't named `SK` and `DIM_` already, select your fact tables in the model tree, hit run, and check the output pane for the summary.
+
+## What's still rough
+
+It only handles the simple case: one surrogate key on the fact table pointing to exactly one dimension. ==Role-playing dimensions== (say, `SK_OrderDate` and `SK_ShipDate` both needing a relationship to `DIM_Date`) aren't handled well, because the existence check only looks at whether *any* relationship already connects the two tables, not whether this specific key is covered. If you use role-playing dimensions, you'll want to either run this before any of those relationships exist, or extend the check to be column-aware.
+
+It also writes straight to the model with no ==dry run==. I always review the diff in source control before saving, rather than trusting the output pane summary alone.

@@ -1,0 +1,163 @@
+---
+title: Removing All DAX Comments From a Model in One Pass
+date: 2026-08-31
+summary: A Tabular Editor 2 script that strips every comment from a model's measures without touching text inside DAX strings.
+tags: [tabular-editor, dax, power-bi]
+draft: false
+---
+
+## The problem
+
+Every measure I write picks up comments as I go. A `//` note about why a filter is there, a `/* */` block I used to disable half a `CALCULATE()` while debugging, a leftover reminder to fix something later. That's fine during development, it's how DAX thinking usually happens for me.
+
+The problem shows up later, when the model is done and I want to hand it off, publish it, or just look at it with fresh eyes. Dozens of measures, each with a few lines of scratch notes mixed into the actual logic. Going through them one at a time in Tabular Editor's expression editor to delete comments by hand is slow, and it's exactly the kind of repetitive task I'd rather not do manually.
+
+Tabular Editor doesn't have a built-in "strip comments" action. ==There's no menu item for this, no DAX function==. The only option was doing it by hand, or writing something to do it for me.
+
+## What I built
+
+Tabular Editor has an Advanced Scripting window that runs plain C# against the model, with `Model` already in scope. That's the natural place for a one-off cleanup script like this: paste it in, run it once, done.
+
+The naive version is a couple of regex replacements for `//.*$` and `/\*.*?\*/`. That breaks the moment a measure has a text string containing something that looks like a comment, which happens more often than you'd think. A measure returning a status label like `"In Progress // Review"` would get silently mangled, and that's worse than not touching it at all.
+
+So instead of regex, the script walks each expression character by character and only strips comments when it's outside of a double-quoted string:
+
+```csharp
+// Removes all comments from all measures' DAX expressions in the current model.
+// Preserves text inside double-quoted DAX strings (including escaped "" quotes).
+
+using System;
+using System.Text;
+using System.Linq;
+
+int changed = 0;
+
+foreach (var m in Model.AllMeasures.ToList())
+{
+    var input = m.Expression;
+    if (string.IsNullOrEmpty(input)) continue;
+
+    var sb = new StringBuilder(input.Length);
+    int i = 0;
+    int n = input.Length;
+    bool inString = false;
+
+    while (i < n)
+    {
+        char c = input[i];
+
+        if (inString)
+        {
+            sb.Append(c);
+            if (c == '"')
+            {
+                // Escaped double quote inside DAX string ("")
+                if (i + 1 < n && input[i + 1] == '"')
+                {
+                    sb.Append('"');
+                    i += 2;
+                    continue;
+                }
+                inString = false;
+                i++;
+                continue;
+            }
+            i++;
+            continue;
+        }
+
+        // Start of string?
+        if (c == '"')
+        {
+            inString = true;
+            sb.Append(c);
+            i++;
+            continue;
+        }
+
+        // Line comment: // ... (until newline)
+        if (c == '/' && i + 1 < n && input[i + 1] == '/')
+        {
+            i += 2;
+            while (i < n && input[i] != '\n' && input[i] != '\r') i++;
+            continue; // skip the comment text
+        }
+
+        // Block comment: /* ... */
+        if (c == '/' && i + 1 < n && input[i + 1] == '*')
+        {
+            i += 2;
+            while (i + 1 < n && !(input[i] == '*' && input[i + 1] == '/')) i++;
+            if (i + 1 < n) i += 2; // skip closing */
+            continue;
+        }
+
+        // Regular char
+        sb.Append(c);
+        i++;
+    }
+
+    // Tidy up: trim trailing spaces per line & collapse consecutive blank lines
+    var withoutComments = sb.ToString();
+    var lines = withoutComments.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+    var outSb = new StringBuilder(withoutComments.Length);
+    bool lastBlank = false;
+    bool firstLine = true;
+
+    for (int k = 0; k < lines.Length; k++)
+    {
+        string line = lines[k].TrimEnd();
+        bool isBlank = line.Length == 0;
+
+        if (isBlank)
+        {
+            if (!lastBlank)
+            {
+                if (!firstLine) outSb.Append('\n');
+                // keep a single blank line
+                lastBlank = true;
+                firstLine = false;
+            }
+            // else: skip extra blank lines
+        }
+        else
+        {
+            if (!firstLine) outSb.Append('\n');
+            outSb.Append(line);
+            lastBlank = false;
+            firstLine = false;
+        }
+    }
+
+    string cleaned = outSb.ToString();
+    if (withoutComments.EndsWith("\n") && !cleaned.EndsWith("\n")) cleaned += "\n";
+
+    if (!object.Equals(input, cleaned))
+    {
+        m.Expression = cleaned;
+        changed++;
+    }
+}
+
+Console.WriteLine("Removed comments from " + changed + " measure(s).");
+```
+
+The `inString` flag is the whole trick. Once the parser hits an opening `"`, everything gets copied through untouched, including a `//` or `/*` sitting inside the string, until it finds the matching closing `"`. It also checks for `""`, which is how DAX escapes a literal quote character inside a string, so it doesn't close the string one character too early on something like `"She said ""hello"""`.
+
+Stripping comments leaves gaps behind: blank lines where a `//` note used to sit on its own line, trailing spaces where a comment used to trail a code line. The second pass cleans that up, trimming trailing whitespace on every line and collapsing runs of blank lines down to one, so the result reads like a measure written clean rather than one that had text torn out of it.
+
+It only rewrites `m.Expression` when the cleaned version actually differs from the original, and keeps a count of how many measures changed. Running it on a model prints something like:
+
+```text
+Removed comments from 14 measure(s).
+```
+
+To use it: open the model in Tabular Editor 2, open the **Advanced Scripting** window, paste the script in, hit run. No selection needed, it walks every measure in the model on its own.
+
+## What's still rough
+
+It only touches measures. Calculated columns, calculated tables, and row-level security filters can carry comments too, and right now none of those are covered. Extending it just means adding `Model.AllColumns` and a couple of other collections to the loop.
+
+There's also no way to tell it "keep this one comment." It's all or nothing, which works for the case I built it for, ==final cleanup before publishing a model==, but not for trimming noisy comments while keeping the useful ones. For that I still do it by hand.
+
+And since it writes to `m.Expression` directly, undo relies entirely on Tabular Editor's own undo history rather than anything the script itself provides. ==Worth keeping a saved copy of the model before running it on anything you can't easily revert.==
