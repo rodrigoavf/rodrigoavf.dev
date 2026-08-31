@@ -10,7 +10,7 @@ export const site = {
     "Notes, tutorials and projects on data analysis and data engineering by Rodrigo Ferreira.",
   /** Longer blurb under the headline on the home page. */
   intro:
-    "I'm a Lead Data consultant specializing in Microsoft Fabric and Databricks with over ten years of experience across Brazil, China and Portugal. This is where I write up what I work out along the way — and keep the references I got tired of looking up twice.",
+    "I'm a Lead Data consultant specializing in Microsoft Fabric and Databricks with over a decade of experience. This is where I write up what I work out along the way, showcase my work, and share the knowledge I have on managing data.",
   nav: [
     { href: "/", label: "Home" },
     { href: "/writing", label: "Writing" },
