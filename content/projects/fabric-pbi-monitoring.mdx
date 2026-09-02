@@ -71,7 +71,7 @@ import pandas as pd
 import sempy.fabric as fabric
 from sempy.fabric import PowerBIRestClient
 from pyspark.sql.functions import col
-from pyspark.sql.types import BooleanType, TimestampType
+from pyspark.sql.types import BooleanType, TimestampType, NullType, StringType
 
 try:
     from notebookutils import mssparkutils
@@ -210,6 +210,18 @@ def process_workspace(ws_row, pbi_client):
             )
         else:
             df_items.columns = [c.replace(" ", "") for c in df_items.columns]
+            
+            # --- OPTIMIZATION: Immediately drop unused columns at the source ---
+            unwanted_cols = [
+                "LastUsedTime", 
+                "LastUpdatedDate", 
+                "OwnerSource", 
+                "TotalViews", 
+                "LastExecutionTime", 
+                "LastExecutionStatus"
+            ]
+            df_items.drop(columns=[c for c in unwanted_cols if c in df_items.columns], inplace=True)
+            
             name_col = next(
                 (c for c in ["DisplayName", "Name", "ItemName"] if c in df_items.columns),
                 None,
@@ -481,27 +493,22 @@ try:
             if col_name in df_catalog.columns:
                 df_catalog[col_name] = pd.to_datetime(df_catalog[col_name], errors="coerce")
 
-        # Explicitly remove unwanted columns if present
-        target_drop_cols = [
-            "LastUpdatedDate",
-            "OwnerSource",
-            "TotalViews",
-            "LastExecutionTime",
-            "LastExecutionStatus",
-        ]
-        df_catalog = df_catalog.drop(
-            columns=[c for c in target_drop_cols if c in df_catalog.columns]
-        )
-
         # Convert to PySpark & Cast Schema
         spark_df = spark.createDataFrame(df_catalog)
 
+        # Cast known timestamp columns
         for col_name in ["ExecutionTimestamp", "LastRefreshTime"]:
             if col_name in spark_df.columns:
                 spark_df = spark_df.withColumn(col_name, col(col_name).cast(TimestampType()))
 
         if "IsSystemItem" in spark_df.columns:
             spark_df = spark_df.withColumn("IsSystemItem", col("IsSystemItem").cast(BooleanType()))
+
+        # Safety Check: Catch any other completely null columns and cast them to StringType 
+        # to prevent future 'VOID' type errors from the Semantic Model engine.
+        for field in spark_df.schema.fields:
+            if isinstance(field.dataType, NullType):
+                spark_df = spark_df.withColumn(field.name, col(field.name).cast(StringType()))
 
         # Reconcile Multi-User Runs against Existing Delta Table
         table_name = "Catalog_Inventory_Analysis"
