@@ -1,0 +1,177 @@
+---
+title: SCD Types Explained: Which Slowly Changing Dimension Fits Your Table
+date: 2026-09-04
+summary: A practical breakdown of SCD Type 0 through Type 6, how each one works, what it costs, and which situations call for it.
+tags: [data-engineering, data-warehousing, sql]
+draft: false
+---
+
+## What a dimension actually is
+
+In a data warehouse, tables generally split into two roles. Fact tables hold the events, an order placed, a page view, a payment. Dimension tables hold the descriptive context around those events, who the customer was, what product was involved, which store it happened in. If a fact table is a list of numbers and foreign keys, the dimension tables are what turn those keys into something a person can read: "customer C-500" becomes a name, a city, an email, a loyalty tier.
+
+A typical star schema has one fact table (`fact_sales`, say) surrounded by several dimension tables it joins to: `dim_customer`, `dim_product`, `dim_store`, `dim_date`. Each row in `dim_customer` describes one customer; each row in `fact_sales` points at a customer, a product and a date, then records the measure, like the amount sold.
+
+That's straightforward until a customer's details change after the fact has already happened. This is where the "slowly changing" part comes in, dimensions do change, just far less often than the facts pointing at them, and how you handle that change determines whether your historical reports stay accurate or quietly rewrite themselves.
+
+Every dimension table eventually faces the same question: a customer moves city, changes their email, or gets bumped to a new loyalty tier. Do you overwrite the old value, keep it around, or do something in between? The answer is a Slowly Changing Dimension (SCD).
+
+There are six commonly used SCD types (0, 1, 2, 3, 4 and 6, yes, 5 is skipped in most naming conventions because it never caught on as a standalone pattern). None of them is a "best" choice. Each one trades storage and query complexity for how much history it keeps, and the right pick depends entirely on whether that history actually matters to the business.
+
+I'll use the same example table throughout: `dim_customer`, with `city`, `email` and `loyalty_tier` as the attributes that change over time.
+
+## Type 0: Fixed, never changes
+
+Some attributes are supposed to stay exactly as they were on day one. Original sign-up date, the country a customer first registered in, the promo code that acquired them. If the source system sends a corrected value, you ignore it. Type 0 isn't really a change-handling strategy, it's a deliberate decision that this column is immutable in the warehouse regardless of what happens upstream.
+
+**Use it for:** attributes where the historical, original value is the entire point, and any "correction" from the source is treated as noise, not truth.
+
+## Type 1: Overwrite, no history
+
+The simplest option. A new value comes in, you update the row in place, the old value is gone.
+
+| customer_key | city   | email             |
+| ------------ | ------ | ----------------- |
+| 1001         | Porto  | ana@example.com   |
+
+Customer moves to Lisbon, source sends the update, and after the load:
+
+| customer_key | city   | email             |
+| ------------ | ------ | ----------------- |
+| 1001         | Lisbon | ana@example.com   |
+
+No trace of Porto anywhere. Every fact table row joined to this customer, past and future, now reads "Lisbon" as the city, even for orders that shipped when they lived in Porto.
+
+**Use it for:** typo fixes, corrections, or attributes where past reporting should reflect the current state (a customer's *current* address, not the address they had when a given order shipped). ==If nobody would ever ask "what was this value last quarter," Type 1 is the right default.==
+
+## Type 2: New row per change
+
+This is the one people mean when they say "SCD" without qualifying it. Instead of updating the row, you close it out and insert a new one, with `effective_date`, `end_date` and usually an `is_current` flag.
+
+| customer_key | customer_id | city   | effective_date | end_date   | is_current |
+| ------------ | ----------- | ------ | --------------- | ---------- | ---------- |
+| 1001         | C-500       | Porto  | 2024-01-10       | 2026-06-14 | false      |
+| 1002         | C-500       | Lisbon | 2026-06-15       | 9999-12-31 | true       |
+
+`customer_key` is a surrogate key, unique per version. `customer_id` is the stable business key that ties both rows to the same real customer. A sale made in April joins to `customer_key` 1001 and correctly shows Porto, even though the customer lives in Lisbon now.
+
+```sql
+-- Closing out the old row and inserting the new one
+update dim_customer
+set end_date = '2026-06-14', is_current = false
+where customer_id = 'C-500' and is_current = true;
+
+-- Then insert the new row
+insert into dim_customer (customer_id, city, effective_date, end_date, is_current)
+values ('C-500', 'Lisbon', '2026-06-15', '9999-12-31', true);
+```
+
+**Use it for:** any attribute where getting the historical value wrong would misstate a past report. Sales territory, price tier, address at time of delivery. This is the default choice when in doubt, because it's the only type that fully protects historical accuracy.
+
+**The cost:** the table grows with every change, and every query needs to either filter on `is_current` or join on a date range depending on whether it wants "now" or "as of then." For a dimension with frequent, high-cardinality changes, that growth adds up fast.
+
+## Type 3: One extra column for the previous value
+
+Instead of a new row, you add a column that holds just the prior value.
+
+| customer_key | current_tier | previous_tier |
+| ------------ | ------------ | -------------- |
+| 1001         | Gold         | Silver         |
+
+No new rows, no surrogate key versioning, just one column tracking one step back. If the customer changes tier again, `previous_tier` gets overwritten and the value before that is gone for good.
+
+**Use it for:** cases where you specifically need a "before vs. after" comparison and nothing older than that, like measuring the immediate impact of a tier upgrade on spending. It's a narrow tool. The moment someone asks "what was their tier two changes ago," Type 3 can't answer.
+
+## Type 4: A separate history table
+
+Keep the main dimension table Type 1 (fast, current-only, one row per entity), and push every change into a second table that logs the full history.
+
+`dim_customer` (current):
+
+| customer_id | city   |
+| ----------- | ------ |
+| C-500       | Lisbon |
+
+`dim_customer_history`:
+
+| customer_id | city   | changed_at          |
+| ----------- | ------ | -------------------- |
+| C-500       | Porto  | 2024-01-10 09:00     |
+| C-500       | Lisbon | 2026-06-15 14:22     |
+
+Reports and dashboards that only need "who is this customer right now" hit the lean current table. Anyone who needs a full audit trail queries the history table separately.
+
+**Use it for:** high-change-frequency attributes where you don't want the operational dimension table bloated with Type 2 rows, but compliance or audit requirements still demand a complete change log somewhere.
+
+## Type 5: Type 1 pointer into a Type 4 mini-dimension
+
+This is why it doesn't get much airtime: it's not a new mechanism, it's Type 4 with one extra piece bolted on, and it solves a fairly specific problem.
+
+Type 4 already splits a dimension into a stable base table and a fast-changing mini-dimension (say, `dim_customer` for name and email, plus `dim_customer_demographics` for things like income band or credit score band that shift constantly). The mini-dimension holds one row per *distinct combination* of values, not one row per customer, and a `dim_customer_demographics_key` on the fact table pins each sale to whatever combination was true at the time.
+
+The gap Type 4 leaves open: if you want "this customer's *current* demographics," you have to filter the mini-dimension history for the latest row, every time. Type 5 closes that gap by adding a column to the base dimension, `current_demographics_key`, that gets Type-1-overwritten every time the customer's demographics change, always pointing straight at their current mini-dimension row.
+
+| customer_id | city   | current_demographics_key |
+| ----------- | ------ | -------------------------- |
+| C-500       | Lisbon | 42                          |
+
+```sql
+demographics_key | income_band | credit_band
+42                | 40-60k       | Good
+17                | 20-40k       | Fair
+```
+
+A "current demographics by city" report joins `dim_customer` straight to `dim_customer_demographics` on `current_demographics_key`, no filtering for the latest row needed. A historical fact-based report still joins the fact table's own stored `demographics_key` to get the combination that was true *at the time of that sale*. Same mini-dimension, two different join paths depending on whether you want now or then.
+
+**Use it for:** very specific setups where a mini-dimension (Type 4) is already justified by attribute volatility, and current-state lookups against it are frequent enough that re-filtering the mini-dimension every time is a real cost. It's genuinely rare. Most teams that reach for a mini-dimension either don't need the fast "current" pointer, or just add an `is_current` flag to the mini-dimension row itself instead of maintaining a separate pointer column. That's the whole reason Type 5 tends to get a one-line mention instead of its own worked example, it's a real, valid pattern, just a niche one layered on top of Type 4 rather than a distinct way of thinking about change.
+
+## Type 6: The hybrid (1 + 2 + 3)
+
+Combines all three: Type 2 row versioning for full history, a Type 1 style overwrite of a "current value" column on every historical row so it's always up to date, and a Type 3 style "previous value" column for quick before/after comparisons.
+
+| customer_key | city_historical | current_city | previous_city | effective_date | end_date   | is_current |
+| ------------ | ---------------- | ------------- | -------------- | --------------- | ---------- | ---------- |
+| 1001         | Porto            | Lisbon        | Porto          | 2024-01-10       | 2026-06-14 | false      |
+| 1002         | Lisbon           | Lisbon        | Porto          | 2026-06-15       | 9999-12-31 | true       |
+
+Notice `current_city` says "Lisbon" on *both* rows, including the historical one. That means you can filter the entire table by "everyone currently in Lisbon" without joining to find the current row first, while `city_historical` still tells you what the city was during that specific period.
+
+**Use it for:** dimensions that get queried both ways constantly, historical accuracy and current-state lookups, often enough that the extra `update` on every historical row (to keep `current_city` in sync) is worth paying for.
+
+## Comparing them side by side
+
+| Type | History kept                | Storage impact | Query complexity | Typical use case                          |
+| ---- | ---------------------------- | --------------- | ------------------ | ------------------------------------------ |
+| 0    | N/A, value never changes     | None             | None                | Original sign-up date, acquisition source  |
+| 1    | None                          | None             | Low                 | Typo fixes, "current state" attributes     |
+| 2    | Full, one row per version    | High             | Medium              | Sales territory, address at time of order  |
+| 3    | One step back only           | Low              | Low                 | Immediate before/after comparisons         |
+| 4    | Full, in a separate table    | Medium            | Medium (two tables) | Audit trails without slowing the main table|
+| 5    | Full, via mini-dim + current pointer | Medium    | Medium-High (two tables) | Fast current-state lookups on top of a mini-dimension |
+| 6    | Full, plus always-current view | High           | Medium-High         | Heavy use of both historical and current queries |
+
+## Does SCD apply to fact tables too?
+
+No, not by name. SCD is specifically a dimensional modeling term, describing how dimension tables handle change. Fact tables run on a different assumption: once an event is recorded, it happened, and it stays that way. A sale that closed on June 15th stays a sale that closed on June 15th forever. That's what makes facts additive and trustworthy in the first place, if the rows underneath a summed total could shift after the fact, nothing built on top of them would hold up.
+
+That said, two situations in fact tables look similar to what SCD solves. They just go by different names.
+
+**Accumulating snapshot fact tables.** Some processes have a known set of milestones an order moves through: placed, picked, shipped, delivered. Instead of one row per event, an accumulating snapshot table keeps one row per order and updates it in place as each milestone happens, filling in `ship_date`, then later `delivery_date`. The row does change over its lifetime, but this isn't SCD, it's a distinct fact table pattern (alongside transaction fact tables and periodic snapshot fact tables) built for tracking a process, not for reflecting attribute changes on an entity.
+
+**Corrections and adjustments.** When a recorded measure turns out wrong, a refund, a pricing error, a returned item, the standard practice is to insert a new adjusting row rather than overwrite the original. The original sale stays exactly as it was reported at the time, and a second row nets it out or corrects it. It's philosophically close to what Type 2 does for dimensions, don't destroy the historical record, but in fact table land it's just called a correcting transaction or adjustment entry. There's no numbered taxonomy for it the way there is for dimensions.
+
+So the short version: SCD vocabulary belongs to dimension tables specifically. Fact tables have their own separate set of patterns for handling change, and none of them borrow the "Type 1 / Type 2" naming.
+
+## Trade-offs that actually matter
+
+The real decision isn't "which type is best," it's "what does getting this wrong cost me." Overwriting an attribute that feeds historical reporting (Type 1 where you needed Type 2) quietly rewrites the past, every fact row that joins to that dimension shifts its meaning the moment the update runs. Nobody notices until a report that used to make sense stops matching what actually happened.
+
+Going the other way, versioning an attribute that never needed history (Type 2 where Type 1 would've done) just bloats the table and forces every downstream query to deal with `is_current` filters or date-range joins it didn't need to.
+
+Type 4 exists specifically to avoid making that trade-off table-wide: it lets the current table stay Type 1 fast while the history still exists, just somewhere else. Type 6 exists for the opposite pressure, when you're tired of choosing between "give me history" and "give me current state" queries and want one table to answer both.
+
+## The rule of thumb
+
+Start every attribute at Type 1. Only move it to Type 2 if you can name a real report or fact table join that would be wrong without the historical version. Reach for Type 3 only when the ask is genuinely "just the last value," never as a cheaper stand-in for Type 2. Use Type 4 when audit or compliance needs conflict with keeping the operational table fast. Type 6 is worth the extra complexity only once you've confirmed both historical and current-state queries are common enough to justify maintaining two derived columns on every row.
+
+Most dimension tables end up as a mix, Type 1 for most columns and Type 2 for the two or three attributes that actually drive historical reporting. Trying to pick one type for the whole table is usually a mistake.
