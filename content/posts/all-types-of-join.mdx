@@ -1,0 +1,182 @@
+---
+title: "JOIN Types Explained: Power Query Merges vs SQL JOINs"
+date: 2026-09-04
+summary: What each JOIN type actually returns, why a JOIN can work as a filter, and how the same six joins map between Power Query merges and SQL.
+tags: [sql, power-query, data-analysis]
+draft: false
+---
+
+## What a JOIN is for
+
+Most people learn JOINs as "the thing that adds columns from another table." That's true, but it's the smaller half of the story. The bigger half is that a JOIN decides which **rows** survive. Two tables share a key column, and depending on which JOIN type you pick, rows that don't have a match on the other side either get dropped, kept with blanks, or kept specifically because they don't match.
+
+==Which rows disappear is usually more important than which columns get added==, and it's the part people get wrong more often.
+
+Power Query and SQL both do this, and they use the exact same underlying logic. The only thing that changes is the syntax you use to ask for it. So instead of explaining JOINs twice, this post explains them once, then shows the same result produced two ways.
+
+## The sample data
+
+Two small tables, reused for every example below.
+
+**Customers**
+
+| CustomerID | Name   | Country  |
+| ---------- | ------ | -------- |
+| 1          | Ana    | Portugal |
+| 2          | Marco  | Italy    |
+| 3          | Lena   | Germany  |
+| 4          | Tomás  | Portugal |
+
+**Orders**
+
+| OrderID | CustomerID | Amount |
+| ------- | ---------- | ------ |
+| 101     | 1          | 250    |
+| 102     | 2          | 90     |
+| 103     | 1          | 120    |
+| 104     | 5          | 60     |
+
+Two details are there on purpose: order 104 belongs to a customer ID (5) that doesn't exist in Customers, and Lena and Tomás have placed no orders at all. That's enough to show every JOIN type behaving differently.
+
+<Figure
+  src="/images/posts/join-types-power-query-sql/join-venn-diagrams.png"
+  alt="Venn-style diagrams showing inner, left, right, full outer, and anti join row selection"
+  caption="Which rows each join type keeps, using the Customers and Orders sample tables."
+/>
+
+## The types of JOINs
+
+**Inner join.** Keeps only rows that match on both sides. Order 104 has no matching customer, so it's dropped. Result: 3 rows (101, 102, 103).
+
+**Left (outer) join.** Keeps every row from the left table (Orders), matched or not. Order 104 stays, with blank customer fields. Result: 4 rows.
+
+**Right (outer) join.** Keeps every row from the right table (Customers), matched or not. Lena and Tomás show up with blank order fields, since they have no orders. Result: 5 rows.
+
+**Full outer join.** Keeps everything from both sides. Order 104 stays, Lena and Tomás stay, nothing is dropped. Result: 6 rows.
+
+**Left anti join.** Keeps only left-table rows with *no* match on the right. Just order 104.
+
+**Right anti join.** Keeps only right-table rows with *no* match on the left. Lena and Tomás.
+
+Left and right are just direction, not a different concept: a right join is a left join with the tables swapped. Anti joins are the mirror image of inner: instead of keeping what matches, they keep what doesn't.
+
+## JOINs can act like filters
+
+Here's the part that trips people up: a JOIN can remove rows even when you never write a `WHERE` clause on the table being filtered, and even when you never select a single column from the other table.
+
+Say I want only the orders placed by customers based in Portugal. Country isn't a column on Orders at all, it lives on Customers. But if I inner join Orders to Customers and add a condition on `Country`, the join propagates that condition back onto Orders:
+
+```sql
+select o.*
+from Orders o
+inner join Customers c
+  on o.CustomerID = c.CustomerID
+where c.Country = 'Portugal';
+```
+
+Only Ana qualifies (Tomás is Portuguese too, but he has zero orders, so he contributes nothing). Result: orders 101 and 103. Orders got filtered using a column that doesn't even exist on the Orders table, purely because of the join.
+
+Anti joins push this further: a left anti join between Orders and Customers *is* a filter, full stop. "Give me every order with no matching customer" is a data quality check, not a column lookup. You never touch a `WHERE` clause, the join kind itself is the filter.
+
+<Callout type="warning" title="NOT IN vs NOT EXISTS">
+If you emulate an anti join in SQL with `NOT IN` instead of `NOT EXISTS`, watch out for `NULL`s on the right-hand column. A single `NULL` in the list makes `NOT IN` return no rows at all, silently. `NOT EXISTS` doesn't have this problem, use it instead.
+</Callout>
+
+## Doing this in Power Query
+
+Power Query builds all of this through **Merge Queries**: pick the two tables, pick the matching column on each, and choose a **Join Kind**. Behind the UI, it's a single `Table.NestedJoin` call.
+
+Inner join, keeping only matched rows:
+
+```powerquery
+let
+    Source = Table.NestedJoin(
+        Orders, {"CustomerID"},
+        Customers, {"CustomerID"},
+        "CustomerDetails", JoinKind.Inner
+    )
+in
+    Source
+```
+
+After this step, `CustomerDetails` is a column of nested tables, one per row, expanded with the "Expand" button (or `Table.ExpandTableColumn`) to pull out `Name` and `Country`.
+
+Left outer is the same call with `JoinKind.LeftOuter`, right outer with `JoinKind.RightOuter`, full outer with `JoinKind.FullOuter`. Only the enum value changes.
+
+The filter case from above, orders with no matching customer, is where Power Query makes the "join as filter" idea explicit. `LeftAnti` returns just order 104, and there's nothing to expand, because the whole point is the row set, not any column from Customers:
+
+```powerquery
+let
+    Source = Table.NestedJoin(
+        Orders, {"CustomerID"},
+        Customers, {"CustomerID"},
+        "CustomerDetails", JoinKind.LeftAnti
+    )
+in
+    Source
+```
+
+`RightAnti` gives you Lena and Tomás the same way. This is the standard Power Query pattern for "find the rows in table A that don't exist in table B", and it's used constantly for data quality checks before a load.
+
+## Doing this in SQL
+
+Same tables, same six results, plain SQL syntax.
+
+```sql
+-- Inner: 3 rows
+select o.OrderID, o.Amount, c.Name, c.Country
+from Orders o
+inner join Customers c on o.CustomerID = c.CustomerID;
+
+-- Left outer: 4 rows
+select o.OrderID, o.Amount, c.Name, c.Country
+from Orders o
+left join Customers c on o.CustomerID = c.CustomerID;
+
+-- Right outer: 5 rows
+select o.OrderID, o.Amount, c.Name, c.Country
+from Orders o
+right join Customers c on o.CustomerID = c.CustomerID;
+
+-- Full outer: 6 rows
+select o.OrderID, o.Amount, c.Name, c.Country
+from Orders o
+full outer join Customers c on o.CustomerID = c.CustomerID;
+
+-- Left anti: order 104 only
+select o.*
+from Orders o
+where not exists (
+    select 1 from Customers c where c.CustomerID = o.CustomerID
+);
+
+-- Right anti: Lena and Tomás
+select c.*
+from Customers c
+where not exists (
+    select 1 from Orders o where o.CustomerID = c.CustomerID
+);
+```
+
+SQL has no `ANTI JOIN` keyword, `NOT EXISTS` (or `NOT IN`, with the caveat above) is how it's expressed. Some engines (Postgres, SQL Server) also support `EXCEPT`, but `NOT EXISTS` is the most portable version.
+
+## Power Query vs SQL: quick reference
+
+| Result you want              | SQL                          | Power Query Join Kind |
+| ----------------------------- | ----------------------------- | ---------------------- |
+| Only matching rows            | `INNER JOIN`                  | `Inner`                |
+| All of the left table         | `LEFT JOIN`                   | `LeftOuter`            |
+| All of the right table        | `RIGHT JOIN`                  | `RightOuter`           |
+| Everything, matched or not    | `FULL OUTER JOIN`             | `FullOuter`            |
+| Left rows with no match       | `WHERE NOT EXISTS (...)`      | `LeftAnti`             |
+| Right rows with no match      | `WHERE NOT EXISTS (...)`      | `RightAnti`            |
+
+The row logic is identical on both sides of that table. What differs is that SQL has dedicated keywords for the four common joins but emulates anti joins with a subquery, while Power Query has a dedicated Join Kind for all six, anti joins included, because they show up constantly in ETL-style cleanup work.
+
+## Which one to reach for
+
+If the data already lives in a database, do the join in SQL and let the engine use its indexes. Pulling both tables into Power Query first just to merge them there throws away that advantage.
+
+If you're combining files, API pulls, or queries that don't share a database (an Excel export merged with a SharePoint list, say), Power Query's merge is the right tool, because there's no engine underneath to push the join down to.
+
+Either way, the six join types mean the same thing. Once you can predict which rows survive an inner, left, right, full, or anti join on paper, moving between the two tools is just a change of syntax, not a new concept to learn.
