@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { EmailLink } from "@/components/email-link";
+import { JsonLd } from "@/components/json-ld";
 import { PageShell } from "@/components/page-shell";
 import { Portrait } from "@/components/portrait";
 import { site } from "@/lib/site";
@@ -133,6 +134,15 @@ const languages = [
   { name: "Mandarin", level: "Elementary" },
 ];
 
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: "Rodrigo Ferreira",
+  jobTitle: site.role,
+  url: site.url,
+  sameAs: site.social.map((link) => link.href),
+};
+
 export default function AboutPage() {
   return (
     <PageShell
@@ -146,6 +156,7 @@ export default function AboutPage() {
         />
       }
     >
+      <JsonLd data={personJsonLd} />
       <div className="prose">
         <p>
           My name is Rodrigo Ferreira, I build business intelligence solutions on the Microsoft and Databricks stack — pipelines and automation at one end, semantic models and reports at the other.

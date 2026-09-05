@@ -2,14 +2,29 @@ import Link from "next/link";
 import { Container } from "@/components/container";
 import { MdxContent } from "@/components/mdx/mdx-content";
 import { Figure } from "@/components/mdx/figure";
+import { JsonLd } from "@/components/json-ld";
 import { Toc } from "@/components/toc";
 import { formatDate, type Entry } from "@/lib/content";
+import { site } from "@/lib/site";
 import { getToc } from "@/lib/toc";
 
 /** The shared article layout for a single post or project. */
 export function EntryPage({ entry, backTo }: { entry: Entry; backTo: { href: string; label: string } }) {
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: entry.title,
+    description: entry.summary,
+    datePublished: entry.date,
+    dateModified: entry.date,
+    url: `${site.url}${entry.href}`,
+    author: { "@type": "Person", name: site.name, url: site.url },
+    ...(entry.cover ? { image: `${site.url}${entry.cover}` } : {}),
+  };
+
   return (
     <Container className="py-12 sm:py-16" data-tone={entry.collection}>
+      <JsonLd data={articleJsonLd} />
       <Toc items={getToc(entry.body)} />
       <Link
         href={backTo.href}
