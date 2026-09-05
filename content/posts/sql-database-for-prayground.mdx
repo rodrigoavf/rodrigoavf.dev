@@ -1,0 +1,95 @@
+---
+title: Setting Up a Local SQL Playground with DBeaver
+date: 2026-09-04
+summary: How to set up two local databases, a SQLite file and a real running PostgreSQL server, so you can practice any SQL command without touching anything that actually matters.
+tags: [sql, database]
+draft: false
+---
+
+## The problem
+
+When I started learning SQL, one of the things that felt like it was holding me back the most was not having a place where I could practice absolutely any command without worrying about the consequences. I wanted to run a `DELETE` without a `WHERE` clause and watch what happened. I wanted to `DROP` a table just to see what broke afterward. I wanted to be able to run any `CREATE TABLE` or `CREATE VIEW` command. Every tutorial pointed to some shared demo database, or an online sandbox that reset itself every session, or a company database I was way too scared to touch.
+
+If you're in that same spot, the fix is simple: put a database on your own computer that answers to nobody but you. ==Nothing you do to it matters to anyone but you, and that's exactly the point.== You can create tables, break them, drop the whole schema, and start over in seconds.
+
+I will shouw you two databases types, for two different reasons, and for both we are going ot use DBeaver.
+
+## Installing DBeaver
+
+DBeaver is a free desktop client that can connect to pretty much any database. Download the free Community edition from [dbeaver.io](https://dbeaver.io/download/), install it like any other app, and open it. The first time it launches, it'll ask if you want to create a sample database, which is already very good, it is a database that lives in your computer, compltely under your control and already populated. But we will build our own too.
+
+## Option 1: SQLite, a database that's just a file
+
+SQLite doesn't run as a server. There's no process listening on a port, no service to start or stop. The entire database is one file sitting on your disk, and DBeaver reads and writes to that file directly. This is what makes it "not really live": when you close DBeaver, the database isn't running anywhere, it's just sitting there as a file, exactly like a `.csv` or a `.docx`.
+
+That also makes it the lowest-friction option to start with. To connect:
+
+1. Click **New Database Connection** in DBeaver.
+2. Search for **SQLite** and select it.
+3. Choose a path for a new file (or point it at an existing `.db`/`.sqlite` file).
+4. Click **Test Connection**, then **Finish**.
+
+That's it, no username, no password, no host. You now have a blank database to throw SQL at:
+
+```sql
+-- Creates a table called `students` with three columns: `id`, `name`, and `grade`.
+create table students (
+    id integer primary key,
+    name text not null,
+    grade integer
+);
+
+-- Populates the table with two rows of data.
+insert into students (name, grade) values ('Ana', 9), ('Marco', 10);
+
+-- Retrieves all rows from the `students` table.
+select * from students;
+
+-- Deletes rows from the `students` table where the grade is 9.
+delete from students where grade = 9;
+```
+
+### The sample database
+
+DBeaver ships with a demo dataset based on Chinook (a music store schema with artists, albums, tracks, invoices) that it can build for you as a SQLite file. You can create it during the first launch, and it can also be added at any time afterward. If you skipped it on install, go to **Help → Create Sample Base** in the menu, and DBeaver will set it up as a new connection. It's a good option if you want to practice queries against a more complex schema than the one you just created, and it can be deleted and recreated at any time.
+
+## Option 2: PostgreSQL, a database that's actually running
+
+SQLite is great for getting comfortable with syntax, but it hides a big part of what working with a real database feels like: there's no server process, no connections to manage, no concurrency to think about. PostgreSQL fixes that, because it genuinely runs as a service on your machine, the same way it would on a company's server.
+
+Installing it depends on your OS:
+
+```bash
+# macOS (with Homebrew)
+brew install postgresql@16
+brew services start postgresql@16
+
+# Ubuntu/Debian
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+```
+
+On Windows, grab the installer from [postgresql.org/download](https://www.postgresql.org/download/windows/) and run it. It'll ask you to set a password for the default `postgres` user during setup, keep that, you'll need it in a second. It also bundles pgAdmin, but you can ignore that since we're using DBeaver for everything.
+
+Once it's installed and running, connect from DBeaver:
+
+1. Click **New Database Connection** and choose **PostgreSQL**.
+2. Host: `localhost`, Port: `5432`.
+3. Database: `postgres`, Username: `postgres`, and the password you set during install.
+4. **Test Connection**, then **Finish**.
+
+I chose PostgreSQL because it's the most common open-source database in the wild, and it has a lot of features that SQLite doesn't. But ==you could also use MySQL, SQL Server, or any other database== that DBeaver supports. The steps are similar: install the server, start it, and connect to it from DBeaver.
+
+### Why bother with this over the SQLite file?
+
+A few things open up once there's an actual server behind the database instead of a file:
+
+- **More than one connection at a time.** Two terminals, two apps, or you and a script can all query it at once, which is how real systems behave and SQLite genuinely struggles with.
+- **Other tools can talk to it too.** This is the big one for me: you can point Power BI straight at your local Postgres instance as a live data source, build a report against it, and refresh it, something you can't cleanly do with a SQLite file sitting on disk, not without a lot of extra work anyway.
+- **Closer to what you'd meet at a job.** Schemas, roles and permissions, indexes beyond the basics, proper transactions. SQLite supports a version of some of this, but Postgres is what most companies actually run.
+
+## What's still rough
+
+None of this fully replicates a production environment. Postgres running locally has to be started manually unless you set it to launch on boot, and it does sit in the background using memory even when you're not touching it, which the SQLite file never does. It also won't teach you anything about network latency, backups, or the quirks of a managed service like RDS or Azure Database for PostgreSQL.
+
+But for the actual goal, a place to run any SQL command without fear, both cover it. I use the SQLite file for quick one-off syntax checks, and the local Postgres server for anything that needs to feel like a real project.
