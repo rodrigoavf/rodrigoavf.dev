@@ -34,7 +34,8 @@ That's it, no username, no password, no host. You now have a blank database to t
 ```sql
 -- Creates a table called `students` with three columns: `id`, `name`, and `grade`.
 create table students (
-    id integer primary key,
+    id integer primary key autoincrement, -- SQLite uses `autoincrement` to automatically generate unique IDs for new rows.
+    -- id serial primary key, -- PostgreSQL uses `serial` to automatically generate unique IDs for new rows.
     name text not null,
     grade integer
 );
