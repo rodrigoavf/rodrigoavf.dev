@@ -23,20 +23,33 @@ The naive version is a couple of regex replacements for `//.*$` and `/\*.*?\*/`.
 So instead of regex, the script walks each expression character by character and only strips comments when it's outside of a double-quoted string:
 
 ```csharp
-// Removes all comments from all measures' DAX expressions in the current model.
+// Removes comments from the DAX expressions of SELECTED measures and
+// SELECTED calculated columns only. Select the objects you want to clean
+// in the model tree (Ctrl/Shift+click for multiple) before running this.
+//
 // Preserves text inside double-quoted DAX strings (including escaped "" quotes).
+//
+// Comments that start with the string in `keepCommentPrefix` (after trimming
+// leading whitespace inside the comment) are LEFT IN PLACE instead of removed.
+// Leave `keepCommentPrefix` empty ("") to remove ALL comments.
 
 using System;
 using System.Text;
 using System.Linq;
+using System.Collections.Generic;
+using TabularEditor.TOMWrapper;
+
+// ==================== CONFIGURATION ====================
+// Comments starting with this string are preserved. Case-sensitive.
+// Example: "KEEP:" will preserve "// KEEP: don't touch this"
+// Leave as "" to delete every comment.
+string keepCommentPrefix = "KEEP:";
+// =========================================================
 
 int changed = 0;
 
-foreach (var m in Model.AllMeasures.ToList())
+string RemoveComments(string input, string keepPrefix)
 {
-    var input = m.Expression;
-    if (string.IsNullOrEmpty(input)) continue;
-
     var sb = new StringBuilder(input.Length);
     int i = 0;
     int n = input.Length;
@@ -78,17 +91,41 @@ foreach (var m in Model.AllMeasures.ToList())
         // Line comment: // ... (until newline)
         if (c == '/' && i + 1 < n && input[i + 1] == '/')
         {
+            int start = i;
             i += 2;
+            int contentStart = i;
             while (i < n && input[i] != '\n' && input[i] != '\r') i++;
-            continue; // skip the comment text
+            int contentEnd = i;
+
+            string commentBody = input.Substring(contentStart, contentEnd - contentStart);
+            bool keep = !string.IsNullOrEmpty(keepPrefix) &&
+                        commentBody.TrimStart().StartsWith(keepPrefix, StringComparison.Ordinal);
+
+            if (keep)
+                sb.Append(input.Substring(start, i - start));
+
+            continue; // skip (or already appended) the comment text
         }
 
         // Block comment: /* ... */
         if (c == '/' && i + 1 < n && input[i + 1] == '*')
         {
+            int start = i;
             i += 2;
+            int contentStart = i;
             while (i + 1 < n && !(input[i] == '*' && input[i + 1] == '/')) i++;
-            if (i + 1 < n) i += 2; // skip closing */
+            int contentEnd = i; // exclusive of closing */
+            bool hasClosing = (i + 1 < n);
+            if (hasClosing) i += 2; // skip closing */
+            else i = n;
+
+            string commentBody = input.Substring(contentStart, contentEnd - contentStart);
+            bool keep = !string.IsNullOrEmpty(keepPrefix) &&
+                        commentBody.TrimStart().StartsWith(keepPrefix, StringComparison.Ordinal);
+
+            if (keep)
+                sb.Append(input.Substring(start, i - start));
+
             continue;
         }
 
@@ -132,6 +169,16 @@ foreach (var m in Model.AllMeasures.ToList())
     string cleaned = outSb.ToString();
     if (withoutComments.EndsWith("\n") && !cleaned.EndsWith("\n")) cleaned += "\n";
 
+    return cleaned;
+}
+
+// ---- Selected measures ----
+foreach (var m in Selected.Measures)
+{
+    var input = m.Expression;
+    if (string.IsNullOrEmpty(input)) continue;
+
+    var cleaned = RemoveComments(input, keepCommentPrefix);
     if (!object.Equals(input, cleaned))
     {
         m.Expression = cleaned;
@@ -139,7 +186,21 @@ foreach (var m in Model.AllMeasures.ToList())
     }
 }
 
-Console.WriteLine("Removed comments from " + changed + " measure(s).");
+// ---- Selected calculated columns (regular calculated columns, not calculated table columns) ----
+foreach (var col in Selected.Columns.OfType<CalculatedColumn>())
+{
+    var input = col.Expression;
+    if (string.IsNullOrEmpty(input)) continue;
+
+    var cleaned = RemoveComments(input, keepCommentPrefix);
+    if (!object.Equals(input, cleaned))
+    {
+        col.Expression = cleaned;
+        changed++;
+    }
+}
+
+Console.WriteLine("Removed comments from " + changed + " selected object(s).");
 ```
 
 The `inString` flag is the whole trick. Once the parser hits an opening `"`, everything gets copied through untouched, including a `//` or `/*` sitting inside the string, until it finds the matching closing `"`. It also checks for `""`, which is how DAX escapes a literal quote character inside a string, so it doesn't close the string one character too early on something like `"She said ""hello"""`.
@@ -156,8 +217,4 @@ To use it: open the model in Tabular Editor 2, open the **Advanced Scripting** w
 
 ## What's still rough
 
-It only touches measures. Calculated columns, calculated tables, and row-level security filters can carry comments too, and right now none of those are covered. Extending it just means adding `Model.AllColumns` and a couple of other collections to the loop.
-
-There's also no way to tell it "keep this one comment." It's all or nothing, which works for the case I built it for, ==final cleanup before publishing a model==, but not for trimming noisy comments while keeping the useful ones. For that I still do it by hand.
-
-And since it writes to `m.Expression` directly, undo relies entirely on Tabular Editor's own undo history rather than anything the script itself provides. ==Worth keeping a saved copy of the model before running it on anything you can't easily revert.==
+Since it writes to `m.Expression` directly, undo relies entirely on Tabular Editor's own undo history rather than anything the script itself provides. ==Worth keeping a saved copy of the model before running it on anything you can't easily revert.==
