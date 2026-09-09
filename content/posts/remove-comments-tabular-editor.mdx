@@ -27,6 +27,7 @@ So instead of regex, the script walks each expression character by character and
 // SELECTED calculated columns only. Select the objects you want to clean
 // in the model tree (Ctrl/Shift+click for multiple) before running this.
 //
+// Handles //, -- and /* */ comments.
 // Preserves text inside double-quoted DAX strings (including escaped "" quotes).
 //
 // Comments that start with the string in `keepCommentPrefix` (after trimming
@@ -48,7 +49,10 @@ string keepCommentPrefix = "KEEP:";
 
 int changed = 0;
 
-string RemoveComments(string input, string keepPrefix)
+// NOTE: declared as a Func, not a method. Tabular Editor 2 compiles the script
+// as a method body, so a real method declaration would be a local function
+// and will not compile.
+Func<string, string, string> RemoveComments = (input, keepPrefix) =>
 {
     var sb = new StringBuilder(input.Length);
     int i = 0;
@@ -88,8 +92,11 @@ string RemoveComments(string input, string keepPrefix)
             continue;
         }
 
-        // Line comment: // ... (until newline)
-        if (c == '/' && i + 1 < n && input[i + 1] == '/')
+        // Line comment: // ... or -- ... (until newline)
+        bool isSlashComment = (c == '/' && i + 1 < n && input[i + 1] == '/');
+        bool isDashComment = (c == '-' && i + 1 < n && input[i + 1] == '-');
+
+        if (isSlashComment || isDashComment)
         {
             int start = i;
             i += 2;
@@ -104,7 +111,7 @@ string RemoveComments(string input, string keepPrefix)
             if (keep)
                 sb.Append(input.Substring(start, i - start));
 
-            continue; // skip (or already appended) the comment text
+            continue;
         }
 
         // Block comment: /* ... */
@@ -144,18 +151,16 @@ string RemoveComments(string input, string keepPrefix)
     for (int k = 0; k < lines.Length; k++)
     {
         string line = lines[k].TrimEnd();
-        bool isBlank = line.Length == 0;
+        bool isBlank = (line.Length == 0);
 
         if (isBlank)
         {
             if (!lastBlank)
             {
                 if (!firstLine) outSb.Append('\n');
-                // keep a single blank line
                 lastBlank = true;
                 firstLine = false;
             }
-            // else: skip extra blank lines
         }
         else
         {
@@ -166,11 +171,8 @@ string RemoveComments(string input, string keepPrefix)
         }
     }
 
-    string cleaned = outSb.ToString();
-    if (withoutComments.EndsWith("\n") && !cleaned.EndsWith("\n")) cleaned += "\n";
-
-    return cleaned;
-}
+    return outSb.ToString();
+};
 
 // ---- Selected measures ----
 foreach (var m in Selected.Measures)
@@ -179,28 +181,28 @@ foreach (var m in Selected.Measures)
     if (string.IsNullOrEmpty(input)) continue;
 
     var cleaned = RemoveComments(input, keepCommentPrefix);
-    if (!object.Equals(input, cleaned))
+    if (input != cleaned)
     {
         m.Expression = cleaned;
         changed++;
     }
 }
 
-// ---- Selected calculated columns (regular calculated columns, not calculated table columns) ----
+// ---- Selected calculated columns ----
 foreach (var col in Selected.Columns.OfType<CalculatedColumn>())
 {
     var input = col.Expression;
     if (string.IsNullOrEmpty(input)) continue;
 
     var cleaned = RemoveComments(input, keepCommentPrefix);
-    if (!object.Equals(input, cleaned))
+    if (input != cleaned)
     {
         col.Expression = cleaned;
         changed++;
     }
 }
 
-Console.WriteLine("Removed comments from " + changed + " selected object(s).");
+Info("Removed comments from " + changed + " selected object(s).");
 ```
 
 The `inString` flag is the whole trick. Once the parser hits an opening `"`, everything gets copied through untouched, including a `//` or `/*` sitting inside the string, until it finds the matching closing `"`. It also checks for `""`, which is how DAX escapes a literal quote character inside a string, so it doesn't close the string one character too early on something like `"She said ""hello"""`.
