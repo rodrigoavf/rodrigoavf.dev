@@ -23,9 +23,8 @@ The naive version is a couple of regex replacements for `//.*$` and `/\*.*?\*/`.
 So instead of regex, the script walks each expression character by character and only strips comments when it's outside of a double-quoted string:
 
 ```csharp
-// Removes comments from the DAX expressions of SELECTED measures and
-// SELECTED calculated columns only. Select the objects you want to clean
-// in the model tree (Ctrl/Shift+click for multiple) before running this.
+// Removes comments from the DAX expressions of SELECTED measures, 
+// SELECTED calculated columns, AND all measures/columns inside SELECTED TABLES.
 //
 // Handles //, -- and /* */ comments.
 // Preserves text inside double-quoted DAX strings (including escaped "" quotes).
@@ -33,36 +32,34 @@ So instead of regex, the script walks each expression character by character and
 // Comments that start with the string in `keepCommentPrefix` (after trimming
 // leading whitespace inside the comment) are LEFT IN PLACE instead of removed.
 // Leave `keepCommentPrefix` empty ("") to remove ALL comments.
-
+ 
 using System;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
 using TabularEditor.TOMWrapper;
-
+ 
 // ==================== CONFIGURATION ====================
 // Comments starting with this string are preserved. Case-sensitive.
 // Example: "KEEP:" will preserve "// KEEP: don't touch this"
 // Leave as "" to delete every comment.
 string keepCommentPrefix = "KEEP:";
 // =========================================================
-
+ 
 int changed = 0;
-
-// NOTE: declared as a Func, not a method. Tabular Editor 2 compiles the script
-// as a method body, so a real method declaration would be a local function
-// and will not compile.
+ 
 Func<string, string, string> RemoveComments = (input, keepPrefix) =>
 {
     var sb = new StringBuilder(input.Length);
     int i = 0;
     int n = input.Length;
     bool inString = false;
-
+    bool commentRemoved = false; // Tracks if we actually deleted anything
+ 
     while (i < n)
     {
         char c = input[i];
-
+ 
         if (inString)
         {
             sb.Append(c);
@@ -82,7 +79,7 @@ Func<string, string, string> RemoveComments = (input, keepPrefix) =>
             i++;
             continue;
         }
-
+ 
         // Start of string?
         if (c == '"')
         {
@@ -91,11 +88,11 @@ Func<string, string, string> RemoveComments = (input, keepPrefix) =>
             i++;
             continue;
         }
-
+ 
         // Line comment: // ... or -- ... (until newline)
         bool isSlashComment = (c == '/' && i + 1 < n && input[i + 1] == '/');
         bool isDashComment = (c == '-' && i + 1 < n && input[i + 1] == '-');
-
+ 
         if (isSlashComment || isDashComment)
         {
             int start = i;
@@ -103,17 +100,23 @@ Func<string, string, string> RemoveComments = (input, keepPrefix) =>
             int contentStart = i;
             while (i < n && input[i] != '\n' && input[i] != '\r') i++;
             int contentEnd = i;
-
+ 
             string commentBody = input.Substring(contentStart, contentEnd - contentStart);
             bool keep = !string.IsNullOrEmpty(keepPrefix) &&
                         commentBody.TrimStart().StartsWith(keepPrefix, StringComparison.Ordinal);
-
-            if (keep)
+ 
+            if (keep) 
+            {
                 sb.Append(input.Substring(start, i - start));
-
+            } 
+            else 
+            {
+                commentRemoved = true; // We successfully stripped a comment
+            }
+ 
             continue;
         }
-
+ 
         // Block comment: /* ... */
         if (c == '/' && i + 1 < n && input[i + 1] == '*')
         {
@@ -125,34 +128,46 @@ Func<string, string, string> RemoveComments = (input, keepPrefix) =>
             bool hasClosing = (i + 1 < n);
             if (hasClosing) i += 2; // skip closing */
             else i = n;
-
+ 
             string commentBody = input.Substring(contentStart, contentEnd - contentStart);
             bool keep = !string.IsNullOrEmpty(keepPrefix) &&
                         commentBody.TrimStart().StartsWith(keepPrefix, StringComparison.Ordinal);
-
-            if (keep)
+ 
+            if (keep) 
+            {
                 sb.Append(input.Substring(start, i - start));
-
+            }
+            else 
+            {
+                commentRemoved = true; // We successfully stripped a comment
+            }
+ 
             continue;
         }
-
+ 
         // Regular char
         sb.Append(c);
         i++;
     }
-
-    // Tidy up: trim trailing spaces per line & collapse consecutive blank lines
+    
+    // If no comments were stripped, return the exact original DAX (trailing spaces and all)
+    if (!commentRemoved) 
+    {
+        return input;
+    }
+ 
+    // Tidy up ONLY if comments were removed: trim trailing spaces per line & collapse consecutive blank lines
     var withoutComments = sb.ToString();
     var lines = withoutComments.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
     var outSb = new StringBuilder(withoutComments.Length);
     bool lastBlank = false;
     bool firstLine = true;
-
+ 
     for (int k = 0; k < lines.Length; k++)
     {
         string line = lines[k].TrimEnd();
         bool isBlank = (line.Length == 0);
-
+ 
         if (isBlank)
         {
             if (!lastBlank)
@@ -170,16 +185,39 @@ Func<string, string, string> RemoveComments = (input, keepPrefix) =>
             firstLine = false;
         }
     }
-
+ 
     return outSb.ToString();
 };
 
-// ---- Selected measures ----
-foreach (var m in Selected.Measures)
+// ======================================================================
+// GATHER TARGET OBJECTS
+// We use a HashSet to avoid processing the same object twice.
+// ======================================================================
+
+var targetMeasures = new HashSet<Measure>();
+var targetColumns = new HashSet<CalculatedColumn>();
+
+// 1. Add explicitly selected measures & columns
+foreach (var m in Selected.Measures) targetMeasures.Add(m);
+foreach (var col in Selected.Columns.OfType<CalculatedColumn>()) targetColumns.Add(col);
+
+// 2. Add all measures & columns from explicitly selected tables
+foreach (var table in Selected.Tables)
+{
+    foreach (var m in table.Measures) targetMeasures.Add(m);
+    foreach (var col in table.Columns.OfType<CalculatedColumn>()) targetColumns.Add(col);
+}
+
+// ======================================================================
+// PROCESS TARGET OBJECTS
+// ======================================================================
+
+// ---- Process measures ----
+foreach (var m in targetMeasures)
 {
     var input = m.Expression;
     if (string.IsNullOrEmpty(input)) continue;
-
+ 
     var cleaned = RemoveComments(input, keepCommentPrefix);
     if (input != cleaned)
     {
@@ -187,13 +225,13 @@ foreach (var m in Selected.Measures)
         changed++;
     }
 }
-
-// ---- Selected calculated columns ----
-foreach (var col in Selected.Columns.OfType<CalculatedColumn>())
+ 
+// ---- Process calculated columns ----
+foreach (var col in targetColumns)
 {
     var input = col.Expression;
     if (string.IsNullOrEmpty(input)) continue;
-
+ 
     var cleaned = RemoveComments(input, keepCommentPrefix);
     if (input != cleaned)
     {
@@ -201,8 +239,8 @@ foreach (var col in Selected.Columns.OfType<CalculatedColumn>())
         changed++;
     }
 }
-
-Info("Removed comments from " + changed + " selected object(s).");
+ 
+Info("Removed comments from " + changed + " object(s).");
 ```
 
 The `inString` flag is the whole trick. Once the parser hits an opening `"`, everything gets copied through untouched, including a `//` or `/*` sitting inside the string, until it finds the matching closing `"`. It also checks for `""`, which is how DAX escapes a literal quote character inside a string, so it doesn't close the string one character too early on something like `"She said ""hello"""`.
