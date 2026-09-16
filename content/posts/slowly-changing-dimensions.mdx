@@ -28,6 +28,8 @@ There are six commonly used SCD types (0, 1, 2, 3, 4 and 6, yes, 5 is skipped in
 
 I'll follow Maria through the same example table across every type: `dim_subscriber`, with `plan_tier` as the attribute that changes over time.
 
+<YouTube id="dRn95h_yVZY" />
+
 ## Type 0: Fixed, never changes
 
 Some attributes are supposed to stay exactly as they were on day one. Original sign-up date, the country a subscriber first registered in, the promo code that acquired them. If the source system sends a corrected value, you ignore it. Type 0 is less a change-handling strategy than a deliberate decision that this column is immutable in the warehouse, regardless of what happens upstream.
