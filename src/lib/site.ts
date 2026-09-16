@@ -17,6 +17,7 @@ export const site = {
     { href: "/projects", label: "Projects" },
     { href: "/cheat-sheets", label: "Cheat Sheets" },
     { href: "/about", label: "About" },
+    { href: "/get-in-touch", label: "Get in touch" },
   ],
   social: [
     { href: "https://github.com/rodrigoavf", label: "GitHub" },

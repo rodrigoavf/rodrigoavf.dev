@@ -292,35 +292,42 @@ export default function AboutPage() {
         </ul>
       </Section>
 
-      <Section title="Get in touch">
+      <Section title="Get in touch" id="get-in-touch">
         <p className="text-sm leading-relaxed text-muted text-pretty">
-          Happy to talk about Power BI, Fabric, or anything else on this site.
+          I&apos;m available for freelance and contract work: Power BI reports,
+          Fabric or Databricks pipelines, and data engineering builds. If
+          that&apos;s something you need, reach out.
         </p>
-        <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-          <li>
-            <EmailLink className="text-accent hover:underline" />
-          </li>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <EmailLink className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90" />
           {site.social.map((link) => (
-            <li key={link.href}>
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-accent hover:underline"
-              >
-                {link.label}
-              </a>
-            </li>
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+            >
+              {link.label}
+            </a>
           ))}
-        </ul>
+        </div>
       </Section>
     </PageShell>
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+  id,
+}: {
+  title: string;
+  children: ReactNode;
+  id?: string;
+}) {
   return (
-    <section className="mt-14 border-t border-border pt-8">
+    <section id={id} className="mt-14 scroll-mt-24 border-t border-border pt-8">
       <h2 className="mb-6 flex items-center gap-2.5 text-xl font-semibold tracking-tight">
         <span aria-hidden="true" className="h-4 w-1 rounded-full bg-accent" />
         {title}

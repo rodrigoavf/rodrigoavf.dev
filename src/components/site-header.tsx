@@ -1,11 +1,23 @@
 import Link from "next/link";
 import { Container } from "@/components/container";
 import { Logo } from "@/components/logo";
+import { NavDropdown } from "@/components/nav-dropdown";
 import { SearchDialog } from "@/components/search-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { site } from "@/lib/site";
 
 const navItems = site.nav.filter((item) => item.href !== "/");
+
+// The desktop row groups the three collections under one "Browse" dropdown
+// to save space — without it, "Get in touch" had zero room left and pushed
+// the row into horizontal overflow around 768px (a common tablet width).
+const collectionHrefs = ["/writing", "/projects", "/cheat-sheets"];
+const collectionItems = navItems.filter((item) =>
+  collectionHrefs.includes(item.href),
+);
+const otherItems = navItems.filter(
+  (item) => !collectionHrefs.includes(item.href),
+);
 
 export function SiteHeader() {
   return (
@@ -26,7 +38,8 @@ export function SiteHeader() {
           {/* Inline from sm up; below that the links move to their own row so
               the bar cannot overflow on a phone. */}
           <nav className="hidden items-center gap-5 text-sm text-muted sm:flex">
-            {navItems.map((item) => (
+            <NavDropdown label="Read about data" items={collectionItems} />
+            {otherItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

@@ -34,6 +34,12 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
+                  href="/get-in-touch"
+                  className="rounded-lg border border-accent/40 bg-accent/8 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/15"
+                >
+                  Available for freelance work
+                </Link>
+                <Link
                   href="/writing"
                   className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
                 >
