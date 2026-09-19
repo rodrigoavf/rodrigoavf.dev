@@ -8,11 +8,23 @@ draft: false
 
 A shop keeps its data in two tables. The orders table has one row per order: an `order_id`, the `client_id` of the buyer and the `amount`. The clients table has one row per person: a `client_id`, an `email` and a `name`.
 
-<Figure
-  src="/images/posts/6-join-types-explained/orders-and-clients.png"
-  alt="An orders table with columns order_id, client_id and amount next to a clients table with columns client_id, email and name"
-  caption="Five orders and five clients. The client_id column links the two tables."
-/>
+==Orders Table==
+| order_id | client_id | amount |
+| -------- | --------- | ------ |
+| 1        | 101       | 10     |
+| 2        | 102       | 23     |
+| 3        | 103       | 7      |
+| 4        | 104       | 11     |
+| 5        | 105       | 5      |
+
+==Clients Table==
+| client_id | name         | email            |
+| --------- | ------------ | ---------------- |
+| 101       | Mary Jane    | maryj@email.com  |
+| 102       | John Wick    | johnw@email.com  |
+| 103       | Tony Stark   | tonys@email.com  |
+| 104       | Sponge Bob   | bobs@email.com   |
+| 105       | Peter Parker | peterp@email.com |
 
 Order 1 says client 101 spent 10. The orders table can't tell you who client 101 is, because names and emails live in the clients table. The `client_id` column links them.
 
@@ -33,6 +45,8 @@ Joining `orders` to `clients` on `client_id` gives this:
 All five orders found their client. Real data has gaps: a new client has no orders, or an order points to a client someone deleted. Your join type controls what happens to those rows. Pick the wrong one and rows vanish with no error message. An inner join where you needed a left join drops orders from your revenue total, and nothing warns you.
 
 Both SQL and Power Query depend on joins. SQL writes them as `JOIN` clauses. Power Query calls them merges and puts them behind a dialog window. The operation is the same in both, so the join types you learn in one carry over to the other. Reports that combine two tables, from a monthly sales summary to a data warehouse model, rely on joins.
+
+<YouTube id="Zgb4_XJ3e84" />
 
 ## Merging tables in Power Query
 
@@ -292,3 +306,9 @@ WHERE l.key_l IS NULL;
 | Right anti | Right rows with no match             | Right Anti            | 6, 7                |
 
 ==Decide what should happen to rows without a partner, then pick the join that does it.== Keep them from one side for a left or right join, or from both sides for a full join. Drop them for an inner join, or return them as the whole result for an anti join. A right join and a right anti join match their left versions once you swap the tables.
+
+<Figure
+  src="/images/posts/6-join-types-explained/6-types-of-joins.png"
+  alt="Quick reference for the six joins: left, right, inner, full, left anti and right anti. Each shows two overlapping circles with the kept area shaded."
+  caption="Quick reference for the six joins: left, right, inner, full, left anti and right anti. Each shows two overlapping circles with the kept area shaded."
+/>
