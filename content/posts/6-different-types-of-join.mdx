@@ -133,7 +133,7 @@ LEFT JOIN right_table AS r
 | 4     | L4      | 4     | R5      |
 | 5     | L5      | null  | null    |
 
-==All five rows of `left_table` survive, matched or not.== Keys 6 and 7 disappear because they have no home on the left.
+==All five rows of== `left_table` ==survive, matched or not.== Keys 6 and 7 disappear because they have no home on the left.
 
 Use a left join when one table is your main subject and the other adds detail. Orders and clients fit: you keep all orders, including one whose client is missing from the clients table.
 
